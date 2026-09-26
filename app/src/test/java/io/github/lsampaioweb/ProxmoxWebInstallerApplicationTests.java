@@ -8,6 +8,7 @@ class ProxmoxWebInstallerApplicationTests {
 
   @Test
   void contextLoads() {
+    // Context startup is the assertion for this smoke test.
   }
 
 }
