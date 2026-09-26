@@ -4,7 +4,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +31,6 @@ class AnswerServiceImpl implements AnswerService {
   private static final String OUTCOME_NOT_FOUND = "NOT_FOUND";
   private static final String OUTCOME_UNREADABLE = "UNREADABLE";
   private static final String OUTCOME_INVALID_TOML = "INVALID_TOML";
-  private static final String TOML_EXTENSION = ".toml";
 
   private final AnswerMapper answerMapper;
   private final AnswerRepository answerRepository;
@@ -39,8 +40,8 @@ class AnswerServiceImpl implements AnswerService {
   @Override
   public byte[] findAnswer(AnswerRequest request, String clientAddress) {
     Instant startedAt = Instant.now();
+    String macMetadata = requestMacMetadata(request);
     String normalizedMac = null;
-    String filename = null;
     String outcome = OUTCOME_SUCCESS;
     String errorCode = "";
 
@@ -53,13 +54,13 @@ class AnswerServiceImpl implements AnswerService {
 
       for (String mac : macs) {
         normalizedMac = mac;
-        filename = mac + TOML_EXTENSION;
         Optional<byte[]> content = readAnswer(mac);
         if (content.isPresent()) {
           return content.get();
         }
       }
 
+      // If no matching answer file is found, throw an exception to indicate a miss.
       throw new AnswerNotFoundException();
     } catch (InvalidAnswerRequestException ex) {
       outcome = OUTCOME_BAD_REQUEST;
@@ -78,7 +79,7 @@ class AnswerServiceImpl implements AnswerService {
       errorCode = ex.getErrorCode();
       throw ex;
     } finally {
-      recordAudit(startedAt, clientAddress, request, normalizedMac, filename, outcome, errorCode);
+      recordAudit(startedAt, clientAddress, request, macMetadata, normalizedMac, outcome, errorCode);
     }
   }
 
@@ -101,17 +102,16 @@ class AnswerServiceImpl implements AnswerService {
     }
   }
 
-  private void recordAudit(Instant startedAt, String clientAddress, AnswerRequest request, String normalizedMac,
-      String filename, String outcome, String errorCode) {
+  private void recordAudit(Instant startedAt, String clientAddress, AnswerRequest request, String macMetadata,
+      String normalizedMac, String outcome, String errorCode) {
     long latencyMs = Duration.between(startedAt, Instant.now()).toMillis();
+    String filename = normalizedMac == null ? null : normalizedMac + AnswerProperties.ANSWER_FILE_EXTENSION;
     AnswerRequest.Product product = request.product();
     AnswerRequest.Iso iso = request.iso();
     AnswerRequest.Dmi dmi = request.dmi();
     AnswerRequest.SystemInfo system = dmi == null ? null : dmi.system();
     AnswerRequest.Baseboard baseboard = dmi == null ? null : dmi.baseboard();
     AnswerRequest.Chassis chassis = dmi == null ? null : dmi.chassis();
-    String macs = String.join(",", answerMapper.normalizedMacs(request));
-
     log.info(logMessages.get(
         LOG_AUDIT,
         startedAt.atOffset(ZoneOffset.UTC),
@@ -120,14 +120,13 @@ class AnswerServiceImpl implements AnswerService {
         safeLogField(product == null ? null : product.fullname()),
         safeLogField(iso == null ? null : iso.release()),
         safeLogField(iso == null ? null : iso.isorelease()),
-        product == null || product.enableBtrfs() == null ? "" : product.enableBtrfs(),
         safeLogField(request.schema() == null ? null : request.schema().version()),
         safeLogField(system == null ? null : system.serial()),
         safeLogField(system == null ? null : system.uuid()),
         safeLogField(system == null ? null : system.name()),
         safeLogField(baseboard == null ? null : baseboard.serial()),
         safeLogField(chassis == null ? null : chassis.serial()),
-        safeLogField(macs),
+        safeLogField(macMetadata),
         safeLogField(normalizedMac),
         safeLogField(filename),
         outcome,
@@ -135,11 +134,33 @@ class AnswerServiceImpl implements AnswerService {
         latencyMs));
   }
 
+  private String requestMacMetadata(AnswerRequest request) {
+    List<NetworkInterfaceRequest> interfaces = request.networkInterfaces();
+    if (interfaces == null) {
+      return "";
+    }
+
+    StringJoiner macs = new StringJoiner(",");
+    for (NetworkInterfaceRequest networkInterface : interfaces) {
+      if (networkInterface == null || networkInterface.mac() == null) {
+        continue;
+      }
+
+      String mac = networkInterface.mac().trim();
+      if (!mac.isEmpty()) {
+        macs.add(mac.toLowerCase(Locale.ROOT));
+      }
+    }
+
+    return macs.toString();
+  }
+
   private String safeLogField(String value) {
     if (value == null) {
       return "";
     }
 
+    // Replace control characters and line/paragraph separators with underscores.
     return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
   }
 

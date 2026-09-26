@@ -2,6 +2,7 @@ package io.github.lsampaioweb.answer;
 
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 
 import com.sun.jna.FunctionMapper;
@@ -12,6 +13,7 @@ import com.sun.jna.Pointer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.MessageSource;
 
 /**
  * Creates the runtime root-password hash once during application startup.
@@ -19,6 +21,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 class RootPasswordHashConfiguration {
 
+  private static final String ERROR_ROOT_PASSWORD_REQUIRED = "error.root.password.required";
+  private static final String ERROR_YESCRYPT_SALT_FAILED = "error.root.password.yescrypt.salt.failed";
+  private static final String ERROR_YESCRYPT_HASH_FAILED = "error.root.password.yescrypt.hash.failed";
   private static final String YESCRYPT_PREFIX = "$y$";
   private static final int RANDOM_BYTES_LENGTH = 16;
   private static final int HASH_SETTING_BUFFER_LENGTH = 128;
@@ -30,9 +35,11 @@ class RootPasswordHashConfiguration {
           : method.getName()));
 
   @Bean
-  RootPasswordHash rootPasswordHash(@Value("${proxmox.root-password}") String password) {
+  RootPasswordHash rootPasswordHash(@Value("${proxmox.root-password}") String password, MessageSource messageSource,
+      @Value("${spring.messages.default-locale:en}") String defaultLocaleTag) {
+    Locale defaultLocale = Locale.forLanguageTag(defaultLocaleTag);
     if (password.isBlank()) {
-      throw new IllegalStateException("PROXMOX_ROOT_PASSWORD must not be blank");
+      throw new IllegalStateException(messageSource.getMessage(ERROR_ROOT_PASSWORD_REQUIRED, null, defaultLocale));
     }
 
     byte[] randomBytes = new byte[RANDOM_BYTES_LENGTH];
@@ -48,13 +55,13 @@ class RootPasswordHashConfiguration {
           settingBuffer,
           settingBuffer.length);
       if (settingPointer == null) {
-        throw new IllegalStateException("libcrypt could not generate a yescrypt salt");
+        throw new IllegalStateException(messageSource.getMessage(ERROR_YESCRYPT_SALT_FAILED, null, defaultLocale));
       }
 
       String setting = Native.toString(settingBuffer);
       String hash = CRYPT_LIBRARY.crypt(password, setting);
       if (hash == null || !hash.startsWith(YESCRYPT_PREFIX)) {
-        throw new IllegalStateException("libcrypt could not generate a yescrypt hash");
+        throw new IllegalStateException(messageSource.getMessage(ERROR_YESCRYPT_HASH_FAILED, null, defaultLocale));
       }
 
       return new RootPasswordHash(hash);

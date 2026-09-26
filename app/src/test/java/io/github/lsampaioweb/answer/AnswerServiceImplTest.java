@@ -27,8 +27,8 @@ class AnswerServiceImplTest {
   private static final String CLIENT = "192.0.2.10";
   private static final String FIRST_MAC = "b4:2e:99:ad:b0:c0";
   private static final String SECOND_MAC = "18:c0:4d:f1:fe:c9";
-  private static final String FIRST_FILENAME = "b4:2e:99:ad:b0:c0.toml";
-  private static final String SECOND_FILENAME = "18:c0:4d:f1:fe:c9.toml";
+  private static final String FIRST_FILENAME = FIRST_MAC + AnswerProperties.ANSWER_FILE_EXTENSION;
+  private static final String SECOND_FILENAME = SECOND_MAC + AnswerProperties.ANSWER_FILE_EXTENSION;
   private static final String LOG_AUDIT = "log.answer.audit";
 
   @Mock
@@ -46,7 +46,7 @@ class AnswerServiceImplTest {
   void setUp() {
     answerService = new AnswerServiceImpl(answerMapper, answerRepository, logMessages);
     when(logMessages.get(eq(LOG_AUDIT), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-        any(), any(), any(), any(), any(), any(), any(), any())).thenReturn("audit");
+        any(), any(), any(), any(), any(), any(), any())).thenReturn("audit");
   }
 
   @Test
@@ -87,6 +87,26 @@ class AnswerServiceImplTest {
         .isInstanceOf(InvalidAnswerRequestException.class);
 
     verifyAudit("", "", "BAD_REQUEST", "ANSWER_MAC_REQUIRED");
+  }
+
+  @Test
+  void shouldAuditMalformedMacWithoutLookingUpAnyAnswerFile() {
+    String malformedMac = "b4:2e:99:ad:b0:cg";
+    AnswerRequest request = requestWith(FIRST_MAC, malformedMac);
+    when(answerMapper.normalizedMacs(request)).thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
+
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT))
+        .isInstanceOf(InvalidAnswerRequestException.class);
+
+    verify(answerRepository, never()).readByMac(FIRST_MAC);
+    verify(answerRepository, never()).readByMac(SECOND_MAC);
+    verifyAudit("", "", "BAD_REQUEST", "ANSWER_MAC_INVALID");
+
+    ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
+    verify(logMessages).get(eq(LOG_AUDIT), captor.capture());
+    assertThat(captor.getValue()[12]).isEqualTo(FIRST_MAC + "," + malformedMac);
+    assertThat(captor.getValue()[13]).isEqualTo("");
+    assertThat(captor.getValue()[14]).isEqualTo("");
   }
 
   @Test
@@ -136,7 +156,7 @@ class AnswerServiceImplTest {
   @Test
   void shouldEscapeLineBreaksInRequestMetadataBeforeAuditLogging() {
     AnswerRequest request = new AnswerRequest(null,
-        new AnswerRequest.Product("Proxmox\nforged-outcome=SUCCESS", "pve\r\nforged-field=value", null),
+        new AnswerRequest.Product("Proxmox\nforged-outcome=SUCCESS", "pve\r\nforged-field=value"),
         null,
         new AnswerRequest.Dmi(new AnswerRequest.SystemInfo("serial\u2028forged-field=value", null, null, null),
             null, null),
@@ -163,7 +183,6 @@ class AnswerServiceImplTest {
         eq(LOG_AUDIT),
         any(),
         eq(CLIENT),
-        any(),
         any(),
         any(),
         any(),

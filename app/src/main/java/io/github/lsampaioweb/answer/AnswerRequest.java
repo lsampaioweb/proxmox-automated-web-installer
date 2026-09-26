@@ -10,9 +10,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Proxmox automated-installation HTTP source request.
  *
  * <p>
- * Documented installer fields are kept for audit. Unknown future keys are
- * ignored
- * so a newer installer document does not fail lookup.
+ * Known installer fields are mapped. Unknown keys are ignored so a newer
+ * installer document does not fail lookup.
  *
  * @param schema            document schema metadata
  * @param product           product being installed
@@ -40,15 +39,13 @@ public record AnswerRequest(
   /**
    * Proxmox product identity from the installer POST.
    *
-   * @param fullname    human-readable product name
-   * @param product     short product code
-   * @param enableBtrfs whether this ISO allows Btrfs
+   * @param fullname human-readable product name
+   * @param product  short product code
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Product(
       String fullname,
-      String product,
-      @JsonProperty("enable_btrfs") Boolean enableBtrfs) {
+      String product) {
   }
 
   /**

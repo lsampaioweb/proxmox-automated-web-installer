@@ -1,5 +1,6 @@
 package io.github.lsampaioweb.answer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -66,6 +68,13 @@ class AnswerRestControllerTest {
         "network_interfaces": []
       }
       """;
+  private static final String MALFORMED_MAC_BODY = """
+      {
+        "network_interfaces": [
+          { "mac": "b4:2e:99:ad:b0:cg" }
+        ]
+      }
+      """;
 
   private final MockMvc mockMvc;
 
@@ -78,7 +87,7 @@ class AnswerRestControllerTest {
   }
 
   @Test
-  void shouldReturnTomlBytesForValidLookup() throws Exception {
+  void shouldIgnoreUnknownProductFieldsAndReturnTomlBytesForValidLookup() throws Exception {
     byte[] toml = "[global]\nkeyboard = \"en-us\"\n".getBytes();
     when(answerService.findAnswer(any(AnswerRequest.class), anyString())).thenReturn(toml);
 
@@ -88,6 +97,11 @@ class AnswerRestControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().contentType(APPLICATION_TOML))
         .andExpect(content().bytes(toml));
+
+    ArgumentCaptor<AnswerRequest> requestCaptor = ArgumentCaptor.forClass(AnswerRequest.class);
+    verify(answerService).findAnswer(requestCaptor.capture(), anyString());
+    assertThat(requestCaptor.getValue().product())
+        .isEqualTo(new AnswerRequest.Product("Proxmox VE", "pve"));
   }
 
   @Test
@@ -107,15 +121,26 @@ class AnswerRestControllerTest {
   void shouldReturn400ForInvalidJson() throws Exception {
     mockMvc.perform(post("/answer")
         .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "en")
         .content("{ not-json"))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.error").value("Bad Request"))
         .andExpect(jsonPath("$.errorCode").value("INVALID_JSON"))
-        .andExpect(jsonPath("$.message").isNotEmpty())
+        .andExpect(jsonPath("$.message").value("The request body is not valid JSON."))
         .andExpect(jsonPath("$.path").value("/answer"))
         .andExpect(jsonPath("$.fields").doesNotExist());
+  }
+
+  @Test
+  void shouldLocalizeInvalidJsonMessageForBrazilianPortuguese() throws Exception {
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "pt-BR")
+        .content("{ not-json"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("O corpo da requisição não é um JSON válido."));
   }
 
   @Test
@@ -144,6 +169,34 @@ class AnswerRestControllerTest {
   }
 
   @Test
+  void shouldReturnLocalized400ForMalformedMac() throws Exception {
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+        .thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
+
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "en")
+        .content(MALFORMED_MAC_BODY))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("ANSWER_MAC_INVALID"))
+        .andExpect(jsonPath("$.message").value("The network interface MAC address is invalid."));
+  }
+
+  @Test
+  void shouldLocalizeMalformedMacErrorForBrazilianPortuguese() throws Exception {
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+        .thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
+
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "pt-BR")
+        .content(MALFORMED_MAC_BODY))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("ANSWER_MAC_INVALID"))
+        .andExpect(jsonPath("$.message").value("O endereço MAC da interface de rede é inválido."));
+  }
+
+  @Test
   void shouldReturn404WhenAnswerFileIsMissing() throws Exception {
     when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
         .thenThrow(new AnswerNotFoundException());
@@ -154,6 +207,21 @@ class AnswerRestControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.errorCode").value("ANSWER_NOT_FOUND"));
+  }
+
+  @Test
+  void shouldLocalizeDomainErrorMessageForBrazilianPortuguese() throws Exception {
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+        .thenThrow(new AnswerNotFoundException());
+
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "pt-BR")
+        .content(VALID_BODY))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errorCode").value("ANSWER_NOT_FOUND"))
+        .andExpect(jsonPath("$.message")
+            .value("Nenhum arquivo de resposta foi encontrado para os endereços MAC solicitados."));
   }
 
   @Test

@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,7 +21,7 @@ class I18nConsistencyTest {
   private static final String PT_BR_MESSAGES = "i18n/messages_pt_BR.properties";
 
   @Test
-  void localeBundlesShouldContainExactlySameKeysAndPlaceholderArity() {
+  void localeBundlesShouldContainExactlySameKeysAndPlaceholders() {
     Properties en = loadProperties(EN_MESSAGES);
     Properties ptBr = loadProperties(PT_BR_MESSAGES);
 
@@ -32,12 +34,12 @@ class I18nConsistencyTest {
         .containsExactlyInAnyOrderElementsOf(ptBr.stringPropertyNames());
 
     for (String key : en.stringPropertyNames()) {
-      int enArity = placeholderCount(en.getProperty(key));
-      int ptArity = placeholderCount(ptBr.getProperty(key));
+      List<String> enPlaceholders = placeholders(en.getProperty(key));
+      List<String> ptPlaceholders = placeholders(ptBr.getProperty(key));
 
-      assertThat(ptArity)
-          .as("placeholder arity mismatch for key: %s", key)
-          .isEqualTo(enArity);
+      assertThat(ptPlaceholders)
+          .as("placeholder mismatch for key: %s", key)
+          .containsExactlyElementsOf(enPlaceholders);
     }
   }
 
@@ -57,19 +59,20 @@ class I18nConsistencyTest {
     }
   }
 
-  private int placeholderCount(String messageTemplate) {
+  private List<String> placeholders(String messageTemplate) {
+    List<String> placeholders = new ArrayList<>();
     if (messageTemplate == null) {
-      return 0;
+      return placeholders;
     }
 
     Matcher matcher = PLACEHOLDER_PATTERN.matcher(messageTemplate);
-    int count = 0;
-
     while (matcher.find()) {
-      count++;
+      placeholders.add(matcher.group());
     }
 
-    return count;
+    placeholders.sort(String::compareTo);
+
+    return placeholders;
   }
 
 }

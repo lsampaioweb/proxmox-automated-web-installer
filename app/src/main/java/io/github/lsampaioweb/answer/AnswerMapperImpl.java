@@ -25,6 +25,9 @@ class AnswerMapperImpl implements AnswerMapper {
       if (networkInterface != null && networkInterface.mac() != null) {
         String mac = networkInterface.mac().trim();
         if (!mac.isEmpty()) {
+          if (!AnswerProperties.MAC_ADDRESS_PATTERN.matcher(mac).matches()) {
+            throw InvalidAnswerRequestException.forMalformedMacAddress();
+          }
           macs.add(mac.toLowerCase(Locale.ROOT));
         }
       }
