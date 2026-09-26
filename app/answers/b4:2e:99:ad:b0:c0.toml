@@ -1,0 +1,20 @@
+# Seeded from 03-proxmox-cluster host_vars mac_bind[0].
+# Host: pve-01.lan.homelab
+# First NIC: enp1board0
+# Password hash is rendered from PROXMOX_ROOT_PASSWORD; set disk-list before install. See answers/README.md.
+[global]
+keyboard = "en-us"
+country = "br"
+fqdn = "pve-01.lan.homelab"
+mailto = "root@pve-01.lan.homelab"
+timezone = "America/Sao_Paulo"
+root-password-hashed = "__PROXMOX_ROOT_PASSWORD_HASH__"
+reboot-on-error = false
+reboot-mode = "reboot"
+
+[network]
+source = "from-dhcp"
+
+[disk-setup]
+filesystem = "ext4"
+disk-list = ["sda"]

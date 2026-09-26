@@ -1,0 +1,145 @@
+package io.github.lsampaioweb.answer;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import io.github.lsampaioweb.core.i18n.LogMessages;
+
+/**
+ * Looks up answer files and records safe audit metadata for each request.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+class AnswerServiceImpl implements AnswerService {
+
+  private static final String LOG_AUDIT = "log.answer.audit";
+  private static final String LOG_MAC_ATTEMPT = "log.answer.mac.attempt";
+  private static final String MAC_HIT = "HIT";
+  private static final String MAC_MISS = "MISS";
+  private static final String OUTCOME_SUCCESS = "SUCCESS";
+  private static final String OUTCOME_BAD_REQUEST = "BAD_REQUEST";
+  private static final String OUTCOME_NOT_FOUND = "NOT_FOUND";
+  private static final String OUTCOME_UNREADABLE = "UNREADABLE";
+  private static final String OUTCOME_INVALID_TOML = "INVALID_TOML";
+  private static final String TOML_EXTENSION = ".toml";
+
+  private final AnswerMapper answerMapper;
+  private final AnswerRepository answerRepository;
+  private final LogMessages logMessages;
+
+  @Override
+  public byte[] findAnswer(AnswerRequest request, String clientAddress) {
+    Instant startedAt = Instant.now();
+    String normalizedMac = null;
+    String filename = null;
+    String outcome = OUTCOME_SUCCESS;
+    String errorCode = "";
+
+    try {
+      List<String> macs = answerMapper.normalizedMacs(request);
+      if (macs.isEmpty()) {
+        outcome = OUTCOME_BAD_REQUEST;
+        throw new InvalidAnswerRequestException();
+      }
+
+      for (String mac : macs) {
+        normalizedMac = mac;
+        filename = mac + TOML_EXTENSION;
+        Optional<byte[]> content = readAnswer(mac);
+        if (content.isPresent()) {
+          return content.get();
+        }
+      }
+
+      throw new AnswerNotFoundException();
+    } catch (InvalidAnswerRequestException ex) {
+      outcome = OUTCOME_BAD_REQUEST;
+      errorCode = ex.getErrorCode();
+      throw ex;
+    } catch (AnswerNotFoundException ex) {
+      outcome = OUTCOME_NOT_FOUND;
+      errorCode = ex.getErrorCode();
+      throw ex;
+    } catch (AnswerUnreadableException ex) {
+      outcome = OUTCOME_UNREADABLE;
+      errorCode = ex.getErrorCode();
+      throw ex;
+    } catch (InvalidAnswerTomlException ex) {
+      outcome = OUTCOME_INVALID_TOML;
+      errorCode = ex.getErrorCode();
+      throw ex;
+    } finally {
+      recordAudit(startedAt, clientAddress, request, normalizedMac, filename, outcome, errorCode);
+    }
+  }
+
+  private Optional<byte[]> readAnswer(String mac) {
+    try {
+      byte[] content = answerRepository.readByMac(mac);
+      traceMacAttempt(mac, MAC_HIT);
+
+      return Optional.of(content);
+    } catch (AnswerNotFoundException _) {
+      traceMacAttempt(mac, MAC_MISS);
+
+      return Optional.empty();
+    }
+  }
+
+  private void traceMacAttempt(String mac, String result) {
+    if (log.isDebugEnabled()) {
+      log.debug(logMessages.get(LOG_MAC_ATTEMPT, mac, result));
+    }
+  }
+
+  private void recordAudit(Instant startedAt, String clientAddress, AnswerRequest request, String normalizedMac,
+      String filename, String outcome, String errorCode) {
+    long latencyMs = Duration.between(startedAt, Instant.now()).toMillis();
+    AnswerRequest.Product product = request.product();
+    AnswerRequest.Iso iso = request.iso();
+    AnswerRequest.Dmi dmi = request.dmi();
+    AnswerRequest.SystemInfo system = dmi == null ? null : dmi.system();
+    AnswerRequest.Baseboard baseboard = dmi == null ? null : dmi.baseboard();
+    AnswerRequest.Chassis chassis = dmi == null ? null : dmi.chassis();
+    String macs = String.join(",", answerMapper.normalizedMacs(request));
+
+    log.info(logMessages.get(
+        LOG_AUDIT,
+        startedAt.atOffset(ZoneOffset.UTC),
+        text(clientAddress),
+        text(product == null ? null : product.product()),
+        text(product == null ? null : product.fullname()),
+        text(iso == null ? null : iso.release()),
+        text(iso == null ? null : iso.isorelease()),
+        product == null || product.enableBtrfs() == null ? "" : product.enableBtrfs(),
+        text(request.schema() == null ? null : request.schema().version()),
+        text(system == null ? null : system.serial()),
+        text(system == null ? null : system.uuid()),
+        text(system == null ? null : system.name()),
+        text(baseboard == null ? null : baseboard.serial()),
+        text(chassis == null ? null : chassis.serial()),
+        macs,
+        text(normalizedMac),
+        text(filename),
+        outcome,
+        errorCode,
+        latencyMs));
+  }
+
+  private String text(String value) {
+    if (value == null) {
+      return "";
+    }
+
+    return value;
+  }
+
+}

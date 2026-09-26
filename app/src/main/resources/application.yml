@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: "proxmox-web-installer"
+  messages:
+    basename: "i18n/messages"
+    encoding: "UTF-8"
+    default-locale: "en"
+    fallback-to-system-locale: false
+  threads:
+    virtual:
+      enabled: true
+  profiles:
+    active:
+      # - "development"
+      - "production"
+
+logging:
+  config: "classpath:log/logback-spring.xml"
+  file:
+    max-size: "10MB"
+    max-history: "7"
+    total-size-cap: "1GB"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+  endpoint:
+    health:
+      show-details: "when-authorized"
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+proxmox:
+  root-password: "${PROXMOX_ROOT_PASSWORD}"
+  answers:
+    directory: "./answers"
