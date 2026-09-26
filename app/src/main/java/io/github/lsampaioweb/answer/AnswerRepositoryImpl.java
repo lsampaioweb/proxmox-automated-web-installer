@@ -24,6 +24,7 @@ class AnswerRepositoryImpl implements AnswerRepository {
   private final AnswerProperties answerProperties;
   private final RootPasswordHash rootPasswordHash;
 
+  /** Reads and renders the answer template for the requested MAC address. */
   @Override
   public byte[] readByMac(String normalizedMac) {
     Path answersDirectory = answerProperties.directory().toAbsolutePath().normalize();

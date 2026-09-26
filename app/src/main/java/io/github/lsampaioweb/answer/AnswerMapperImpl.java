@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Component
 class AnswerMapperImpl implements AnswerMapper {
 
+  /** Returns usable interface MAC addresses in normalized request order. */
   @Override
   public List<String> normalizedMacs(AnswerRequest request) {
     List<NetworkInterfaceRequest> interfaces = request.networkInterfaces();
