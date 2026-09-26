@@ -245,10 +245,10 @@ HTTP on a trusted lab segment (not recommended for anything beyond temporary tes
 
 ```bash
 proxmox-auto-install-assistant prepare-iso \
-  /path/to/proxmox-ve.iso \
+  proxmox-ve_9.2-1.iso \
   --fetch-from http \
-  --url "http://172.16.10.X:9443/answer" \
-  --output /path/to/proxmox-ve-auto.iso
+  --url "http://proxmox-auto-install-assistant.lan.homelab:8080/answer" \
+  --output proxmox-ve-auto.iso
 ```
 
 HTTPS with certificate fingerprint (recommended when using an IP or a self-signed / private CA cert):
@@ -260,11 +260,11 @@ openssl x509 -in /path/to/server.crt -noout -fingerprint -sha256
 
 ```bash
 proxmox-auto-install-assistant prepare-iso \
-  /path/to/proxmox-ve.iso \
+  proxmox-ve_9.2-1.iso \
   --fetch-from http \
-  --url "https://answers.lan.homelab/answer" \
+  --url "https://proxmox-auto-install-assistant.lan.homelab/answer" \
   --cert-fingerprint "AA:BB:CC:DD:..." \
-  --output /path/to/proxmox-ve-auto.iso
+  --output proxmox-ve-auto.iso
 ```
 
 This application does not require an authorization token. Do not pass `--answer-auth-token` unless you later add bearer authentication to the service. If set, the token is stored in plaintext inside the ISO.
@@ -272,18 +272,38 @@ This application does not require an authorization token. Do not pass `--answer-
 ### Inspect the prepared ISO
 
 ```bash
-proxmox-auto-install-assistant inspect-iso /path/to/proxmox-ve-auto.iso
+xorriso -indev proxmox-ve-auto.iso -find / -name auto-installer-mode.toml
+cat auto-installer-mode.toml
 ```
 
-Confirm fetch mode is `http` and the URL is your `/answer` endpoint. Sensitive fields are redacted by default; use `--show-sensitive` only when needed.
+The first command confirms that `/auto-installer-mode.toml` is present in the
+prepared ISO. The second shows the preparation settings written beside the ISO;
+confirm `mode = "http"` and that the URL ends in `/answer`. This sidecar file is
+not a readback of the ISO's embedded contents.
 
 ### Boot from USB
 
-Write the prepared ISO to a USB stick (device path is an example — check with `lsblk` first):
+From the directory containing `proxmox-ve-auto.iso`, identify the whole USB disk
+with `lsblk` and unmount all its filesystems before writing. Writing to the disk
+erases its existing contents. `/dev/sdX` is a placeholder; never use a mounted
+path or a partition such as `/dev/sdX1`:
 
 ```bash
-sudo dd if=/path/to/proxmox-ve-auto.iso of=/dev/sdX bs=4M status=progress conv=fsync
+lsblk -o PATH,SIZE,MODEL,TRAN,TYPE,MOUNTPOINTS
+sudo dd if=proxmox-ve-auto.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
+
+If the desktop mounts the USB again after writing, unmount it before checking
+the result. Reconfirm the device name with `lsblk`, then compare the written
+bytes with the ISO:
+
+```bash
+sudo cmp -n "$(stat -c%s proxmox-ve-auto.iso)" proxmox-ve-auto.iso /dev/sdX \
+  && echo "USB matches ISO"
+```
+
+This verifies the image on the USB, including the embedded mode file; it does
+not verify that the installer can reach the answer server from the target host.
 
 Boot the target host from that USB. The **Automated Installation** entry is selected after about 10 seconds. The installer POSTs JSON (including MACs) to your URL; this service returns the matching `{mac}.toml`.
 
