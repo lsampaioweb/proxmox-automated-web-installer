@@ -127,13 +127,13 @@ Logs:
 A successful lookup writes an INFO audit line like:
 
 ```text
-Answer request timestamp=2026-09-20T21:00:00Z client=127.0.0.1 product=pve productName=Proxmox VE iso=9.0 isoRelease=1 enableBtrfs=true schema=1.0 systemSerial=900030XXXX systemUuid=6fb36fd4-77a1-57e6-13ae-XXXXXXcb48d7 systemName=RS700 baseboardSerial=23041870000XXXX chassisSerial=I02308XXXX macs=b4:2e:99:ad:b0:c0 mac=b4:2e:99:ad:b0:c0 file=b4:2e:99:ad:b0:c0.toml outcome=SUCCESS errorCode= latencyMs=4
+Answer request timestamp=2026-09-20T21:00:00Z client=127.0.0.1 product=pve productName=Proxmox VE iso=9.0 isoRelease=1 schema=1.0 systemSerial=900030XXXX systemUuid=6fb36fd4-77a1-57e6-13ae-XXXXXXcb48d7 systemName=RS700 baseboardSerial=23041870000XXXX chassisSerial=I02308XXXX macs=b4:2e:99:ad:b0:c0 mac=b4:2e:99:ad:b0:c0 file=b4:2e:99:ad:b0:c0.toml outcome=SUCCESS errorCode= latencyMs=4
 ```
 
 Every request that reaches the service writes this INFO line, including errors. `outcome` is one of `SUCCESS`, `BAD_REQUEST`, `NOT_FOUND`, `UNREADABLE`, or `INVALID_TOML`. Count them with `grep -c "outcome=SUCCESS"` (and the other outcomes) in the log file.
 
-Request-derived audit fields replace control characters and Unicode line
-separators with `_` so a client cannot forge additional log lines.
+Request-derived audit fields replace control characters and Unicode line and
+paragraph separators with `_` so a client cannot forge additional log lines.
 
 Invalid JSON and Bean Validation never reach the service. Those still start with `Answer request` and use `outcome=BAD_REQUEST errorCode=INVALID_JSON` or `errorCode=VALIDATION_ERROR`.
 
@@ -189,6 +189,17 @@ curl -sS -D - \
 
 Expect `400` and `"errorCode":"ANSWER_MAC_REQUIRED"`. Console audit: `outcome=BAD_REQUEST`.
 
+HTTP 400 malformed MAC:
+
+```bash
+curl -sS -D - \
+  -H "Content-Type: application/json" \
+  -d '{"network_interfaces":[{"mac":"b4:2e:99"}]}' \
+  http://localhost:8080/answer
+```
+
+Expect `400` and `"errorCode":"ANSWER_MAC_INVALID"`. The service rejects the request before filesystem lookup.
+
 HTTP 404 unknown MAC:
 
 ```bash
@@ -208,7 +219,7 @@ tail -f logs/proxmox-web-installer.log
 
 ## ISO preparation
 
-The Proxmox installer only calls this service if the boot media (or DHCP/DNS) tells it the answer URL. Preparing an ISO embeds that URL and enables the **Automated Installation** boot entry.
+The Proxmox installer calls this service when the prepared boot media contains the answer URL. Preparing an ISO embeds that URL and enables the **Automated Installation** boot entry.
 
 Official reference: [Proxmox Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation).
 
@@ -278,44 +289,7 @@ Boot the target host from that USB. The **Automated Installation** entry is sele
 
 Watch the answer-server audit log during the install (`outcome=SUCCESS` and the expected MAC/filename). On the installer, failures often leave clues in `/tmp/fetch_answer.log` and `/tmp/auto_installer`.
 
-### Network boot (PXE)
-
-Instead of a USB ISO, split the prepared image for TFTP/PXE. `--output` must be a directory:
-
-```bash
-proxmox-auto-install-assistant prepare-iso \
-  /path/to/proxmox-ve.iso \
-  --fetch-from http \
-  --url "https://answers.lan.homelab/answer" \
-  --cert-fingerprint "AA:BB:CC:DD:..." \
-  --pxe \
-  --output /srv/tftp/proxmox-auto/
-```
-
-Optional iPXE snippet:
-
-```bash
-proxmox-auto-install-assistant prepare-iso \
-  /path/to/proxmox-ve.iso \
-  --fetch-from http \
-  --url "https://answers.lan.homelab/answer" \
-  --cert-fingerprint "AA:BB:CC:DD:..." \
-  --pxe-loader ipxe \
-  --output /srv/tftp/proxmox-auto/
-```
-
-Answer fetch still uses HTTP(S) to this service; only the kernel/initrd delivery changes.
-
-### Providing the URL without baking it into the ISO
-
-You can use one generic prepared ISO and supply the URL at runtime:
-
-| Method | How |
-|---|---|
-| DHCP option `250` | DHCP returns the answer URL |
-| DNS TXT | Record at `proxmox-auto-installer.{search-domain}` |
-
-TLS fingerprint can come from DHCP option `251` or DNS TXT `proxmox-auto-installer-cert-fingerprint.{search-domain}`, but only when the URL was obtained by the **same** method. Baking `--url` (and optional `--cert-fingerprint`) into the ISO is the simplest path for this project.
+The installer fetches the answer over HTTP(S) from this service.
 
 ### Checklist before first automated install
 
@@ -324,7 +298,7 @@ TLS fingerprint can come from DHCP option `251` or DNS TXT `proxmox-auto-install
 - [ ] A rendered answer from `/answer` passes `proxmox-auto-install-assistant validate-answer`
 - [ ] Answer service is up and reachable from the install NIC network
 - [ ] Curl against `/answer` with a real host MAC returns `200` and TOML
-- [ ] Prepared ISO (or DHCP/DNS) points at that same `/answer` URL
+- [ ] Prepared ISO points at that same `/answer` URL
 - [ ] Audit log shows `SUCCESS` when you curl; installer will use the same path
 
 ## Tests
@@ -341,7 +315,7 @@ Automated tests use a temporary answers directory and do not require a live Prox
 
 | Method | Path | Success | Errors |
 |---|---|---|---|
-| `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON or no usable MAC; `404` no matching file; `500` unreadable file or invalid TOML |
+| `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON, validation error, no usable MAC (`ANSWER_MAC_REQUIRED`), or malformed MAC (`ANSWER_MAC_INVALID`); `404` no matching file; `500` unreadable file or invalid TOML |
 
 Error responses use `application/json` with the documented error envelope and
 stable `errorCode` values.

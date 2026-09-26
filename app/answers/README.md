@@ -9,8 +9,8 @@ Each file is a Proxmox answer template. The committed
 hash generated from `PROXMOX_ROOT_PASSWORD` when the application starts. Source
 files are never modified, and the hash/password are never logged.
 
-Bond/VLAN layout stays with Ansible after install; the installer uses DHCP
-for the first NIC.
+Bond/VLAN layout stays with Ansible after install; the installer configures its
+initial network interface.
 
 ## Configure the root password
 

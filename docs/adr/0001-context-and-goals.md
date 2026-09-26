@@ -29,7 +29,6 @@ The service is intentionally narrow and stateless. Answer-file changes are files
 
 ## Alternatives Considered
 
-1. **Proxmox built-in DHCP/PXE auto-installer** — Rejected: adds complexity to Proxmox network config; less flexible; harder to manage answer files per node.
-2. **Terraform/Ansible provisioning** — Rejected: requires agent on target; this service needs zero prior setup on target machines.
-3. **Static HTTP file server (nginx)** — Rejected: would require manual URL mapping per MAC address; no intelligence; this service adds dynamic lookup.
-4. **Database-backed answer file repository** — Rejected: adds complexity (schema, migration, backup); filesystem is sufficient for personal homelab.
+1. **Terraform/Ansible provisioning** — Rejected: requires agent on target; this service needs zero prior setup on target machines.
+2. **Static HTTP file server (nginx)** — Rejected: would require manual URL mapping per MAC address; no intelligence; this service adds dynamic lookup.
+3. **Database-backed answer file repository** — Rejected: adds complexity (schema, migration, backup); filesystem is sufficient for personal homelab.
