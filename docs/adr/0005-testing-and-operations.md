@@ -22,7 +22,7 @@ Tests must cover the controller and repository, including:
 - filesystem read failure returning 500;
 - invalid TOML returning 500;
 - unchanged source templates, exact password-placeholder substitution, and `application/toml` content type; and
-- audit metadata and the absence of request-body or TOML-content logging, as appropriate.
+- audit metadata, control-character sanitization in request-derived log fields, and the absence of request-body or TOML-content logging, as appropriate.
 
 Use Proxmox's documented compatibility guidance and its `validate-answer` tool to validate rendered answer responses. Committed answer templates contain a password placeholder and are not directly installable. The application parses the rendered TOML to classify invalid content as the specified 500 response.
 

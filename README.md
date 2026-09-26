@@ -132,6 +132,9 @@ Answer request timestamp=2026-09-20T21:00:00Z client=127.0.0.1 product=pve produ
 
 Every request that reaches the service writes this INFO line, including errors. `outcome` is one of `SUCCESS`, `BAD_REQUEST`, `NOT_FOUND`, `UNREADABLE`, or `INVALID_TOML`. Count them with `grep -c "outcome=SUCCESS"` (and the other outcomes) in the log file.
 
+Request-derived audit fields replace control characters and Unicode line
+separators with `_` so a client cannot forge additional log lines.
+
 Invalid JSON and Bean Validation never reach the service. Those still start with `Answer request` and use `outcome=BAD_REQUEST errorCode=INVALID_JSON` or `errorCode=VALIDATION_ERROR`.
 
 With the `debug` profile, each MAC lookup also logs `Answer MAC attempt mac=... result=HIT` or `result=MISS`.

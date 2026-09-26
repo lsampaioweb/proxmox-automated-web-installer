@@ -35,6 +35,7 @@ class AnswerServiceImpl implements AnswerService {
   private final AnswerRepository answerRepository;
   private final LogMessages logMessages;
 
+  /** Finds the first matching answer file and records request audit metadata. */
   @Override
   public byte[] findAnswer(AnswerRequest request, String clientAddress) {
     Instant startedAt = Instant.now();
@@ -96,7 +97,7 @@ class AnswerServiceImpl implements AnswerService {
 
   private void traceMacAttempt(String mac, String result) {
     if (log.isDebugEnabled()) {
-      log.debug(logMessages.get(LOG_MAC_ATTEMPT, mac, result));
+      log.debug(logMessages.get(LOG_MAC_ATTEMPT, safeLogField(mac), result));
     }
   }
 
@@ -114,32 +115,32 @@ class AnswerServiceImpl implements AnswerService {
     log.info(logMessages.get(
         LOG_AUDIT,
         startedAt.atOffset(ZoneOffset.UTC),
-        text(clientAddress),
-        text(product == null ? null : product.product()),
-        text(product == null ? null : product.fullname()),
-        text(iso == null ? null : iso.release()),
-        text(iso == null ? null : iso.isorelease()),
+        safeLogField(clientAddress),
+        safeLogField(product == null ? null : product.product()),
+        safeLogField(product == null ? null : product.fullname()),
+        safeLogField(iso == null ? null : iso.release()),
+        safeLogField(iso == null ? null : iso.isorelease()),
         product == null || product.enableBtrfs() == null ? "" : product.enableBtrfs(),
-        text(request.schema() == null ? null : request.schema().version()),
-        text(system == null ? null : system.serial()),
-        text(system == null ? null : system.uuid()),
-        text(system == null ? null : system.name()),
-        text(baseboard == null ? null : baseboard.serial()),
-        text(chassis == null ? null : chassis.serial()),
-        macs,
-        text(normalizedMac),
-        text(filename),
+        safeLogField(request.schema() == null ? null : request.schema().version()),
+        safeLogField(system == null ? null : system.serial()),
+        safeLogField(system == null ? null : system.uuid()),
+        safeLogField(system == null ? null : system.name()),
+        safeLogField(baseboard == null ? null : baseboard.serial()),
+        safeLogField(chassis == null ? null : chassis.serial()),
+        safeLogField(macs),
+        safeLogField(normalizedMac),
+        safeLogField(filename),
         outcome,
         errorCode,
         latencyMs));
   }
 
-  private String text(String value) {
+  private String safeLogField(String value) {
     if (value == null) {
       return "";
     }
 
-    return value;
+    return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
   }
 
 }

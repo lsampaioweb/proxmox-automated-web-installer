@@ -133,6 +133,31 @@ class AnswerServiceImplTest {
         .noneMatch(value -> String.valueOf(value).contains("secret-install-token"));
   }
 
+  @Test
+  void shouldEscapeLineBreaksInRequestMetadataBeforeAuditLogging() {
+    AnswerRequest request = new AnswerRequest(null,
+        new AnswerRequest.Product("Proxmox\nforged-outcome=SUCCESS", "pve\r\nforged-field=value", null),
+        null,
+        new AnswerRequest.Dmi(new AnswerRequest.SystemInfo("serial\u2028forged-field=value", null, null, null),
+            null, null),
+        List.of(new NetworkInterfaceRequest(FIRST_MAC, null)));
+    when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC));
+    when(answerRepository.readByMac(FIRST_MAC)).thenReturn("[global]".getBytes(StandardCharsets.UTF_8));
+
+    answerService.findAnswer(request, CLIENT);
+
+    ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
+    verify(logMessages).get(eq(LOG_AUDIT), captor.capture());
+    List<String> loggedFields = Arrays.stream(captor.getValue())
+        .filter(String.class::isInstance)
+        .map(String.class::cast)
+        .toList();
+
+    assertThat(loggedFields)
+        .contains("Proxmox_forged-outcome=SUCCESS", "pve__forged-field=value", "serial_forged-field=value")
+        .noneMatch(field -> field.contains("\n") || field.contains("\r") || field.contains("\u2028"));
+  }
+
   private void verifyAudit(String mac, String filename, String outcome, String errorCode) {
     verify(logMessages).get(
         eq(LOG_AUDIT),
