@@ -1,0 +1,38 @@
+### Logs ###
+*.log
+*.gz
+logs/
+
+target/
+release.properties
+pom.xml.releaseBackup
+
+### IDE / editor metadata ###
+.idea/
+*.iml
+.vscode/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.sts4-cache
+
+### Environment / secrets ###
+.env
+.env.*
+!.env.example
+
+### TLS / key material ###
+*.p12
+*.pfx
+*.jks
+*.key
+*.crt
+*.pem
+
+### OS junk ###
+.DS_Store
+Thumbs.db
