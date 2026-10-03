@@ -7,7 +7,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves developer-facing log messages from the i18n bundles.
+ * Looks up log messages in the locale bundles.
  */
 @Component
 public class LogMessages {
@@ -16,7 +16,7 @@ public class LogMessages {
   private final Locale defaultLocale;
 
   /**
-   * Creates the logging message resolver.
+   * Creates a resolver for localized log messages.
    *
    * @param messageSource    localized message source
    * @param defaultLocaleTag configured default locale language tag
@@ -28,7 +28,7 @@ public class LogMessages {
   }
 
   /**
-   * Resolves a log message in the configured default locale.
+   * Looks up a log message in the configured default locale.
    *
    * @param key  message key
    * @param args format arguments
@@ -39,7 +39,7 @@ public class LogMessages {
   }
 
   /**
-   * Resolves a log message in the given locale.
+   * Looks up a log message in the requested locale.
    *
    * @param locale target locale
    * @param key    message key

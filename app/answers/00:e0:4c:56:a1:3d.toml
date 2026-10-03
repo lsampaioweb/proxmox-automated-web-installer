@@ -1,8 +1,7 @@
-# Seeded from 03-proxmox-cluster host_vars mac_bind.
+# Seeded from mac_bind in 03-proxmox-cluster host_vars.
 # Host: pve-05.lan.homelab
-# First NIC: enp1board0
-# Password hash is rendered from PROXMOX_ROOT_PASSWORD; replace disk-list with a
-# stable filter.ID_SERIAL / ID_WWN before a real install. See answers/README.md.
+# Primary NIC: enp1board0
+# The service adds the password hash when it renders this file.
 [global]
 keyboard = "en-us"
 country = "br"
@@ -30,5 +29,5 @@ enabled = true
 
 [disk-setup]
 filesystem = "ext4"
-# WARNING: disk-list = ["sda"] is a placeholder. Prefer filter.ID_SERIAL / ID_WWN.
+# Placeholder only: replace disk-list with a stable selector before installation.
 disk-list = ["sda"]

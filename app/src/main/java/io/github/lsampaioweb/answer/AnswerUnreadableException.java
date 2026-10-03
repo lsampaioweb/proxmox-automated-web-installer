@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 import io.github.lsampaioweb.core.exception.AppException;
 
 /**
- * Raised when the selected answer file cannot be read.
+ * Signals that the selected answer file can't be read.
  */
 public class AnswerUnreadableException extends AppException {
 
@@ -13,7 +13,7 @@ public class AnswerUnreadableException extends AppException {
   private static final String ERROR_CODE = "ANSWER_UNREADABLE";
 
   /**
-   * Creates the exception for an unreadable answer file.
+   * Creates an error for an unreadable answer file.
    *
    * @param cause underlying I/O failure
    */

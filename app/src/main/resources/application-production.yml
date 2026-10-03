@@ -1,7 +1,7 @@
 server:
   port: 8080
-  # Production sits behind a trusted reverse proxy that terminates TLS.
-  # Configure server.ssl.* only if this JVM should terminate TLS itself.
+  # Production traffic reaches this app through an internal TLS-terminating proxy.
+  # Set server.ssl.* only when TLS should terminate in this JVM.
   forward-headers-strategy: "framework"
   error:
     include-stacktrace: "never"

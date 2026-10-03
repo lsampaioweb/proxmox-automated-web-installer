@@ -3,12 +3,12 @@ package io.github.lsampaioweb.answer;
 import java.util.Locale;
 
 /**
- * Resolves a Proxmox answer file for an installer request.
+ * Finds the answer file for a Proxmox installer request.
  */
 public interface AnswerService {
 
   /**
-   * Finds the answer file for the first installer MAC that has a matching file.
+   * Returns the file for the first installer MAC with a matching answer file.
    *
    * @param request       installer request
    * @param clientAddress remote address used in audit metadata

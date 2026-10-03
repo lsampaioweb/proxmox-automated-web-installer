@@ -9,7 +9,7 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 
 /**
- * Configures Accept-Language locale resolution for API responses.
+ * Chooses the API locale from the {@code Accept-Language} header.
  */
 @Configuration
 public class I18nLocaleResolverConfig {
@@ -17,9 +17,9 @@ public class I18nLocaleResolverConfig {
   private static final Locale LOCALE_PT_BR = Locale.of("pt", "BR");
 
   /**
-   * Resolves the request locale from the Accept-Language header.
+   * Creates a resolver for English and Brazilian Portuguese requests.
    *
-   * @return locale resolver limited to English and pt-BR
+   * @return resolver for English and {@code pt-BR}
    */
   @Bean
   LocaleResolver localeResolver() {

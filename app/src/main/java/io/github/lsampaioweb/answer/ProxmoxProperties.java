@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Runtime configuration for answer-file serving.
+ * Runtime settings for serving answer files.
  *
  * @param rootPassword plaintext root password hashed once at startup
  * @param answers      filesystem answer-file store
@@ -19,7 +19,7 @@ public record ProxmoxProperties(String rootPassword, Answers answers) {
   }
 
   /**
-   * Filesystem location of Proxmox answer files.
+   * Directory that holds the Proxmox answer files.
    *
    * @param directory directory that contains answer files
    */

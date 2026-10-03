@@ -3,7 +3,7 @@ package io.github.lsampaioweb.core.exception;
 import org.springframework.http.HttpStatus;
 
 /**
- * Base type for expected application failures that map to an HTTP status.
+ * Base type for expected application errors returned with an HTTP status.
  */
 public abstract class AppException extends RuntimeException {
 
@@ -13,12 +13,12 @@ public abstract class AppException extends RuntimeException {
   private final HttpStatus status;
 
   /**
-   * Creates an application exception.
+   * Sets the message, error code, arguments, and HTTP status for this error.
    *
-   * @param messageKey i18n message key
-   * @param errorCode stable machine error code
-   * @param args message format arguments
-   * @param status HTTP status to return
+   * @param messageKey key used to look up the localized message
+   * @param errorCode  stable code returned to the client
+   * @param args       values inserted into the message
+   * @param status     HTTP status returned to the client
    */
   protected AppException(String messageKey, String errorCode, Object[] args, HttpStatus status) {
     super(messageKey);
@@ -30,7 +30,7 @@ public abstract class AppException extends RuntimeException {
   }
 
   /**
-   * Returns the i18n message key.
+   * Returns the key for the localized message.
    *
    * @return message key
    */
@@ -39,7 +39,7 @@ public abstract class AppException extends RuntimeException {
   }
 
   /**
-   * Returns the stable machine error code.
+   * Returns the error code sent to the client.
    *
    * @return error code
    */
@@ -48,7 +48,7 @@ public abstract class AppException extends RuntimeException {
   }
 
   /**
-   * Returns the message format arguments.
+   * Returns the values inserted into the message.
    *
    * @return format arguments
    */
@@ -57,7 +57,7 @@ public abstract class AppException extends RuntimeException {
   }
 
   /**
-   * Returns the HTTP status for this failure.
+   * Returns the HTTP status for this error.
    *
    * @return HTTP status
    */

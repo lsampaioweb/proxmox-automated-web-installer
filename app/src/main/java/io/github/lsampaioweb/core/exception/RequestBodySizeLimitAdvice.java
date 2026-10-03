@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.RequestBodyAdviceAdapter;
 
 /**
- * Limits the bytes consumed while Spring converts request bodies.
+ * Rejects request bodies larger than the configured limit before parsing.
  */
 @ControllerAdvice
 public class RequestBodySizeLimitAdvice extends RequestBodyAdviceAdapter {
@@ -21,12 +21,12 @@ public class RequestBodySizeLimitAdvice extends RequestBodyAdviceAdapter {
   private static final int MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 
   /**
-   * Applies the body-size limit to MVC request bodies.
+   * Applies this limit to MVC request bodies.
    *
    * @param methodParameter target controller parameter
    * @param targetType      target body type
    * @param converterType   selected message converter
-   * @return {@code true} for MVC request bodies
+   * @return {@code true} for request bodies handled by MVC
    */
   @Override
   public boolean supports(MethodParameter methodParameter, Type targetType,
@@ -35,14 +35,15 @@ public class RequestBodySizeLimitAdvice extends RequestBodyAdviceAdapter {
   }
 
   /**
-   * Rejects oversized bodies before deserialization, including chunked bodies.
+   * Checks the body size before Spring deserializes it, including when its length
+   * is unknown.
    *
-   * @param inputMessage  original request body
+   * @param inputMessage  incoming request body
    * @param parameter     target controller parameter
    * @param targetType    target body type
    * @param converterType selected message converter
-   * @return request body with bounded reads
-   * @throws IOException when the declared body size exceeds the limit
+   * @return input message containing the checked body
+   * @throws IOException if reading fails or the body exceeds the limit
    */
   @Override
   public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter, Type targetType,

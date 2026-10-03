@@ -3,13 +3,13 @@ package io.github.lsampaioweb.answer;
 import java.util.regex.Pattern;
 
 /**
- * Shared answer-file naming and MAC syntax constants.
+ * Shared constants for answer-file names and MAC syntax.
  */
 public final class AnswerProperties {
 
   static final Pattern MAC_ADDRESS_PATTERN = Pattern.compile("[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}");
 
-  /** Canonical answer-file suffix required by this service. */
+  /** Suffix used for every answer file. */
   public static final String ANSWER_FILE_EXTENSION = ".toml";
 
   private AnswerProperties() {

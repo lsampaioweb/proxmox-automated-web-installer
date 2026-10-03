@@ -8,7 +8,7 @@
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
     <version>4.1.1</version>
-    <relativePath /> <!-- lookup parent from repository -->
+    <relativePath /> <!-- Resolve the parent from a Maven repository, not a local file. -->
   </parent>
 
   <groupId>br.com.lsampaioweb</groupId>
@@ -30,25 +30,25 @@
   </scm>
 
   <dependencies>
-    <!-- Web starter for the POST /answer endpoint and embedded servlet container. -->
+    <!-- Handles POST /answer requests in the embedded servlet container. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
-    <!-- Validation starter for request payload constraints on installer JSON. -->
+    <!-- Validates the installer request body. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
-    <!-- Actuator for health, info, and metrics endpoints. -->
+    <!-- Exposes health, info, and metrics. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- Devtools for local development hot reload support only. -->
+    <!-- Enables automatic restarts during local development. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-devtools</artifactId>
@@ -56,41 +56,41 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- TOML parser to classify invalid answer files as HTTP 500 without rewriting bytes. -->
+    <!-- Parses answer files without changing their original bytes. -->
     <dependency>
       <groupId>tools.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-toml</artifactId>
     </dependency>
 
-    <!-- JNA calls the system libcrypt yescrypt implementation. -->
+    <!-- Calls the system libcrypt library to create yescrypt hashes. -->
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
       <version>${jna.version}</version>
     </dependency>
 
-    <!-- Lombok for reducing boilerplate code at compile time. -->
+    <!-- Generates common Java code during compilation. -->
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
 
-    <!-- OpenAPI metadata and development API documentation. -->
+    <!-- Provides OpenAPI metadata and development API docs. -->
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>${springdoc.version}</version>
     </dependency>
 
-    <!-- Spring Boot test starter for unit and slice testing support. -->
+    <!-- Provides unit-test and Spring test support. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
 
-    <!-- Web MVC slice testing support for @WebMvcTest and MockMvc. -->
+    <!-- Provides @WebMvcTest and MockMvc support. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc-test</artifactId>

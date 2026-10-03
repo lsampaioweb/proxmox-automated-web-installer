@@ -156,7 +156,7 @@ class AnswerRestControllerTest {
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.error").value("Bad Request"))
         .andExpect(jsonPath("$.errorCode").value("INVALID_JSON"))
-        .andExpect(jsonPath("$.message").value("The request body is not valid JSON."))
+        .andExpect(jsonPath("$.message").value("The request body isn't valid JSON."))
         .andExpect(jsonPath("$.path").value("/answer"))
         .andExpect(jsonPath("$.fields").doesNotExist());
   }
@@ -187,7 +187,7 @@ class AnswerRestControllerTest {
         .header("Accept-Language", "pt-BR")
         .content("{ not-json"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("O corpo da requisição não é um JSON válido."));
+        .andExpect(jsonPath("$.message").value("O corpo enviado não é um JSON válido."));
   }
 
   @Test
@@ -241,7 +241,7 @@ class AnswerRestControllerTest {
         .content(MALFORMED_MAC_BODY))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("ANSWER_MAC_INVALID"))
-        .andExpect(jsonPath("$.message").value("The network interface MAC address is invalid."));
+        .andExpect(jsonPath("$.message").value("The network interface MAC address doesn't look valid."));
   }
 
   @Test
@@ -255,7 +255,7 @@ class AnswerRestControllerTest {
         .content(MALFORMED_MAC_BODY))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("ANSWER_MAC_INVALID"))
-        .andExpect(jsonPath("$.message").value("O endereço MAC da interface de rede é inválido."));
+        .andExpect(jsonPath("$.message").value("O endereço MAC da interface de rede parece inválido."));
   }
 
   @Test
@@ -283,7 +283,7 @@ class AnswerRestControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errorCode").value("ANSWER_NOT_FOUND"))
         .andExpect(jsonPath("$.message")
-            .value("Nenhum arquivo de resposta foi encontrado para os endereços MAC solicitados."));
+            .value("Nenhum arquivo de resposta corresponde aos MACs desta requisição."));
   }
 
   @Test

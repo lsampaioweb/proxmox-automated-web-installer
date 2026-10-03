@@ -16,8 +16,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
 /**
- * Renders committed answer templates and optionally validates them with the
- * Proxmox helper when it is installed on the test host.
+ * Renders every committed answer template and checks it with the Proxmox tool
+ * when supported.
  */
 class AnswerTemplatesValidationTest {
 

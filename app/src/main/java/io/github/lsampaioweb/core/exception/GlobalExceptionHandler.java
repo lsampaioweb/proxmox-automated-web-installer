@@ -27,8 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import io.github.lsampaioweb.core.i18n.LogMessages;
 
 /**
- * Translates application and framework failures into the shared JSON error
- * envelope.
+ * Turns application and Spring MVC failures into the API's standard JSON
+ * response.
  */
 @Slf4j
 @RestControllerAdvice
@@ -60,10 +60,10 @@ public class GlobalExceptionHandler {
   private final boolean stacktraceEnabled;
 
   /**
-   * Creates the global exception handler.
+   * Sets up the message and logging services used by this handler.
    *
-   * @param messageSource     i18n message source
-   * @param logMessages       developer-facing log message helper
+   * @param messageSource     source of translated API messages
+   * @param logMessages       source of translated log messages
    * @param includeStacktrace {@code server.error.include-stacktrace} value
    */
   public GlobalExceptionHandler(MessageSource messageSource, LogMessages logMessages,
@@ -74,9 +74,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps domain exceptions to the JSON error envelope.
+   * Returns the API response for an application error.
    *
-   * @param ex      failed request
+   * @param ex      application error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -86,9 +86,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps invalid JSON bodies to the JSON error envelope.
+   * Returns an error response when the request body can't be parsed.
    *
-   * @param ex      parse failure
+   * @param ex      body parsing error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -105,9 +105,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps Bean Validation failures to the JSON error envelope.
+   * Returns field errors when request validation fails.
    *
-   * @param ex      validation failure
+   * @param ex      validation error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -124,9 +124,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps unsupported HTTP methods to the JSON error envelope.
+   * Returns an error when the endpoint doesn't accept the HTTP method.
    *
-   * @param ex      method failure
+   * @param ex      method error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -140,9 +140,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps unsupported media types to the JSON error envelope.
+   * Returns an error when the endpoint doesn't accept the request Content-Type.
    *
-   * @param ex      media-type failure
+   * @param ex      media-type error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -156,9 +156,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps unknown URLs to the JSON error envelope.
+   * Returns an error when no endpoint matches the requested URL.
    *
-   * @param ex      missing resource
+   * @param ex      missing resource error
    * @param request current HTTP request
    * @return JSON error response
    */
@@ -169,9 +169,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps unexpected failures to the JSON error envelope.
+   * Returns a generic error response for unexpected failures.
    *
-   * @param ex      unexpected failure
+   * @param ex      unexpected error
    * @param request current HTTP request
    * @return JSON error response
    */

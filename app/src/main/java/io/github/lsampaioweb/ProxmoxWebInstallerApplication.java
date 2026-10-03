@@ -7,14 +7,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import io.github.lsampaioweb.answer.ProxmoxProperties;
 
 /**
- * Starts the Proxmox web installer application.
+ * Starts the Proxmox Web Installer.
  */
 @SpringBootApplication
 @EnableConfigurationProperties(ProxmoxProperties.class)
 public class ProxmoxWebInstallerApplication {
 
   /**
-   * Boots the Spring application.
+   * Starts the Spring Boot application.
    *
    * @param args command-line arguments
    */

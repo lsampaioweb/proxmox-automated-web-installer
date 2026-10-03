@@ -7,11 +7,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Proxmox automated-installation HTTP source request.
+ * Request sent by the Proxmox automated installer.
  *
  * <p>
- * Known installer fields are mapped. Unknown keys are ignored so a newer
- * installer document does not fail lookup.
+ * The fields used by this service are mapped here. Unknown fields are ignored,
+ * so newer installer versions can add data without breaking lookups.
  *
  * @param schema            document schema metadata
  * @param product           product being installed
@@ -28,7 +28,7 @@ public record AnswerRequest(
         @JsonProperty("network_interfaces") @NotEmpty(message = "{error.validation.network.interfaces.required}") List<NetworkInterfaceRequest> networkInterfaces) {
 
     /**
-     * Schema version of the installer POST document.
+     * Schema version reported by the installer.
      *
      * @param version schema version string
      */
@@ -37,7 +37,7 @@ public record AnswerRequest(
     }
 
     /**
-     * Proxmox product identity from the installer POST.
+     * Product details sent by the installer.
      *
      * @param fullname human-readable product name
      * @param product  short product code
@@ -49,7 +49,7 @@ public record AnswerRequest(
     }
 
     /**
-     * Installer ISO release identity.
+     * Release details for the installer ISO.
      *
      * @param release    ISO release
      * @param isorelease ISO point release
@@ -59,7 +59,7 @@ public record AnswerRequest(
     }
 
     /**
-     * DMI identity blocks from the installer POST.
+     * Hardware details reported through DMI.
      *
      * @param system    system DMI block
      * @param baseboard baseboard DMI block
@@ -70,7 +70,7 @@ public record AnswerRequest(
     }
 
     /**
-     * System DMI fields.
+     * System identifiers used in audit logs.
      *
      * @param serial system serial number
      * @param name   system product name
@@ -81,7 +81,7 @@ public record AnswerRequest(
     }
 
     /**
-     * Baseboard DMI fields.
+     * Baseboard details used in audit logs.
      *
      * @param serial baseboard serial number
      */
@@ -90,7 +90,7 @@ public record AnswerRequest(
     }
 
     /**
-     * Chassis DMI fields.
+     * Chassis details used in audit logs.
      *
      * @param serial chassis serial number
      */

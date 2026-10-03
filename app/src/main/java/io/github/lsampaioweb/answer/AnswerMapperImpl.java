@@ -7,12 +7,12 @@ import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 /**
- * Extracts and normalizes MAC addresses from an installer request.
+ * Extracts valid MAC addresses from an installer request.
  */
 @Component
 class AnswerMapperImpl implements AnswerMapper {
 
-  /** Returns usable interface MAC addresses in normalized request order. */
+  /** Returns valid MAC addresses in the order the installer sent them. */
   @Override
   public List<String> normalizedMacs(AnswerRequest request) {
     List<NetworkInterfaceRequest> interfaces = request.networkInterfaces();

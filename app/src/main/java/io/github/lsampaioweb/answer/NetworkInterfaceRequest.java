@@ -3,7 +3,7 @@ package io.github.lsampaioweb.answer;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * One network interface reported by the Proxmox installer.
+ * Network interface details sent by the Proxmox installer.
  *
  * @param mac hardware address of the interface
  */

@@ -1,12 +1,12 @@
 package io.github.lsampaioweb.answer;
 
 /**
- * Yescrypt password hash inserted into generated answer responses.
+ * Yescrypt hash inserted into rendered answer files.
  */
 record RootPasswordHash(String value) {
 
   /**
-   * Returns a redacted representation of this secret value.
+   * Returns a safe summary without exposing the hash.
    *
    * @return redacted password hash marker
    */

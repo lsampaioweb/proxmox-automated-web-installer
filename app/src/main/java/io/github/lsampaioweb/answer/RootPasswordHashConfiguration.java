@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.MessageSource;
 
 /**
- * Creates the runtime root-password hash once during application startup.
+ * Creates the root-password hash once when the application starts.
  */
 @Configuration
 class RootPasswordHashConfiguration {
@@ -35,9 +35,10 @@ class RootPasswordHashConfiguration {
           : method.getName()));
 
   /**
-   * Hashes {@code PROXMOX_ROOT_PASSWORD} once at startup.
+   * Hashes {@code PROXMOX_ROOT_PASSWORD} once when the application starts.
    * <p>
-   * {@code crypt(3)} is not thread-safe; keep this call on the startup path only.
+   * {@code crypt(3)} isn't thread-safe, so this call must stay on the startup
+   * path.
    */
   @Bean
   RootPasswordHash rootPasswordHash(ProxmoxProperties proxmoxProperties, MessageSource messageSource,

@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import io.github.lsampaioweb.core.i18n.LogMessages;
 
 /**
- * Looks up answer files and records safe audit metadata for each request.
+ * Finds answer files and records request audit details.
  */
 @Slf4j
 @Service
@@ -38,7 +38,7 @@ class AnswerServiceImpl implements AnswerService {
   private final AnswerRepository answerRepository;
   private final LogMessages logMessages;
 
-  /** Finds the first matching answer file and records request audit metadata. */
+  /** Returns the first matching answer file and records the request. */
   @Override
   public byte[] findAnswer(AnswerRequest request, String clientAddress, Locale locale) {
     Instant startedAt = Instant.now();
@@ -62,7 +62,7 @@ class AnswerServiceImpl implements AnswerService {
         }
       }
 
-      // If no matching answer file is found, throw an exception to indicate a miss.
+      // No requested MAC matched an answer file.
       throw new AnswerNotFoundException();
     } catch (InvalidAnswerRequestException ex) {
       outcome = OUTCOME_BAD_REQUEST;
@@ -172,7 +172,7 @@ class AnswerServiceImpl implements AnswerService {
       return "";
     }
 
-    // Replace control characters and line/paragraph separators with underscores.
+    // Keep request data from creating extra log lines.
     return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
   }
 

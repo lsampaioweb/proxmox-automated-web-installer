@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 import io.github.lsampaioweb.core.exception.AppException;
 
 /**
- * Raised when the selected answer file is not valid TOML.
+ * Signals that the selected answer file isn't valid TOML.
  */
 public class InvalidAnswerTomlException extends AppException {
 
@@ -13,7 +13,7 @@ public class InvalidAnswerTomlException extends AppException {
   private static final String ERROR_CODE = "ANSWER_INVALID_TOML";
 
   /**
-   * Creates the exception for invalid TOML content.
+   * Creates an error for invalid TOML content.
    *
    * @param cause parse failure
    */

@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Exposes the Proxmox automated-installation HTTP source endpoint.
+ * Handles requests from the Proxmox automated installer.
  */
 @RestController
 @RequiredArgsConstructor
@@ -27,11 +27,11 @@ class AnswerRestController {
   private final AnswerService answerService;
 
   /**
-   * Returns the answer file selected from an installer-reported MAC.
+   * Returns the answer file selected from the installer's MAC addresses.
    *
-   * @param request     installer JSON body
+   * @param request     JSON sent by the installer
    * @param httpRequest current HTTP request
-   * @return exact TOML file bytes
+   * @return TOML answer file
    */
   @PostMapping("/answer")
   public ResponseEntity<byte[]> findAnswer(@Valid @RequestBody AnswerRequest request, HttpServletRequest httpRequest) {

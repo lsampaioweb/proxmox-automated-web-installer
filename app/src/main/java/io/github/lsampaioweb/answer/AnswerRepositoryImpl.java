@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.dataformat.toml.TomlMapper;
 
 /**
- * Resolves answer files from the configured answers directory.
+ * Finds, reads, and renders answer files from the configured directory.
  */
 @Repository
 @RequiredArgsConstructor
@@ -47,7 +47,7 @@ class AnswerRepositoryImpl implements AnswerRepository {
   private final RootPasswordHash rootPasswordHash;
   private final MessageSource messageSource;
 
-  /** Reads and renders the answer template for the requested MAC address. */
+  /** Reads and renders the template for a MAC address. */
   @Override
   public byte[] readByMac(String normalizedMac) {
     if (normalizedMac == null || !AnswerProperties.MAC_ADDRESS_PATTERN.matcher(normalizedMac).matches()) {

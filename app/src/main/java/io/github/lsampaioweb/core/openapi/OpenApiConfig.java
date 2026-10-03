@@ -9,7 +9,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 
 /**
- * Configures OpenAPI document metadata for the exposed REST API.
+ * Adds localized metadata to the REST API documentation.
  */
 @Configuration
 public class OpenApiConfig {
@@ -19,10 +19,10 @@ public class OpenApiConfig {
   private static final String DESCRIPTION_KEY = "openapi.description";
 
   /**
-   * Builds the OpenAPI info block resolved from the default locale.
+   * Creates the OpenAPI info block in the default locale.
    *
-   * @param messageSource i18n message source
-   * @return configured OpenAPI document metadata
+   * @param messageSource source of translated text
+   * @return OpenAPI document metadata
    */
   @Bean
   OpenAPI customOpenApi(MessageSource messageSource) {

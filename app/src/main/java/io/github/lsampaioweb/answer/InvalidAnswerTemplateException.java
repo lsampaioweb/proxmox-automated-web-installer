@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 import io.github.lsampaioweb.core.exception.AppException;
 
 /**
- * Raised when an answer template violates rendering or password-policy rules.
+ * Signals that an answer template failed rendering or password checks.
  */
 public class InvalidAnswerTemplateException extends AppException {
 
@@ -13,7 +13,7 @@ public class InvalidAnswerTemplateException extends AppException {
   private static final String ERROR_CODE = "ANSWER_TEMPLATE_INVALID";
 
   /**
-   * Creates the exception for an invalid answer template.
+   * Creates an error for an invalid answer template.
    *
    * @param cause policy or rendering failure
    */
