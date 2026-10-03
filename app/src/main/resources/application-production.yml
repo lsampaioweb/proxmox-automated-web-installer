@@ -1,8 +1,10 @@
 server:
-  port: 9443
+  port: 8080
+  # Production sits behind a trusted reverse proxy that terminates TLS.
+  # Configure server.ssl.* only if this JVM should terminate TLS itself.
+  forward-headers-strategy: "framework"
   error:
     include-stacktrace: "never"
-
 management:
   endpoint:
     health:

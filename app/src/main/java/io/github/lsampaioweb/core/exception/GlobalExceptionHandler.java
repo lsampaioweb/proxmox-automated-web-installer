@@ -15,10 +15,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.servlet.support.RequestContextUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import io.github.lsampaioweb.core.i18n.LogMessages;
@@ -35,6 +38,9 @@ public class GlobalExceptionHandler {
   private static final String ERR_RESOURCE_NOT_FOUND = "error.resource.not.found";
   private static final String ERR_VALIDATION_FAILED = "error.validation.failed";
   private static final String ERR_INVALID_JSON = "error.request.invalid.json";
+  private static final String ERR_REQUEST_BODY_TOO_LARGE = "error.request.body.too.large";
+  private static final String ERR_METHOD_NOT_ALLOWED = "error.request.method.not.allowed";
+  private static final String ERR_MEDIA_TYPE_UNSUPPORTED = "error.request.media.type.unsupported";
 
   private static final String LOG_UNHANDLED = "log.exception.unhandled";
   private static final String LOG_REJECTED = "log.request.rejected";
@@ -43,6 +49,9 @@ public class GlobalExceptionHandler {
   private static final String CODE_RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
   private static final String CODE_VALIDATION = "VALIDATION_ERROR";
   private static final String CODE_INVALID_JSON = "INVALID_JSON";
+  private static final String CODE_REQUEST_BODY_TOO_LARGE = "REQUEST_BODY_TOO_LARGE";
+  private static final String CODE_METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
+  private static final String CODE_UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE";
 
   private static final String STACKTRACE_ALWAYS = "always";
 
@@ -86,8 +95,11 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex,
       HttpServletRequest request) {
-    log.warn(logMessages.get(LOG_REJECTED, Instant.now().atOffset(ZoneOffset.UTC), request.getRemoteAddr(),
-        CODE_INVALID_JSON));
+    if (ex.getCause() instanceof RequestBodySizeLimitAdvice.RequestBodyTooLargeException) {
+      return requestBodyTooLarge(ex, request);
+    }
+
+    logRejectedRequest(request, CODE_INVALID_JSON);
 
     return problem(HttpStatus.BAD_REQUEST, CODE_INVALID_JSON, ERR_INVALID_JSON, null, request, ex, null);
   }
@@ -102,14 +114,45 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex,
       HttpServletRequest request) {
-    log.warn(logMessages.get(LOG_REJECTED, Instant.now().atOffset(ZoneOffset.UTC), request.getRemoteAddr(),
-        CODE_VALIDATION));
+    logRejectedRequest(request, CODE_VALIDATION);
 
     List<ErrorResponse.FieldError> fields = ex.getBindingResult().getFieldErrors().stream()
         .map(fieldError -> new ErrorResponse.FieldError(fieldError.getField(), fieldError.getDefaultMessage()))
         .toList();
 
     return problem(HttpStatus.BAD_REQUEST, CODE_VALIDATION, ERR_VALIDATION_FAILED, null, request, ex, fields);
+  }
+
+  /**
+   * Maps unsupported HTTP methods to the JSON error envelope.
+   *
+   * @param ex      method failure
+   * @param request current HTTP request
+   * @return JSON error response
+   */
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedException(
+      HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+    logRejectedRequest(request, CODE_METHOD_NOT_ALLOWED);
+
+    return problem(HttpStatus.METHOD_NOT_ALLOWED, CODE_METHOD_NOT_ALLOWED, ERR_METHOD_NOT_ALLOWED, null, request, ex,
+        null);
+  }
+
+  /**
+   * Maps unsupported media types to the JSON error envelope.
+   *
+   * @param ex      media-type failure
+   * @param request current HTTP request
+   * @return JSON error response
+   */
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupportedException(
+      HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+    logRejectedRequest(request, CODE_UNSUPPORTED_MEDIA_TYPE);
+
+    return problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, CODE_UNSUPPORTED_MEDIA_TYPE, ERR_MEDIA_TYPE_UNSUPPORTED, null,
+        request, ex, null);
   }
 
   /**
@@ -134,7 +177,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
-    log.error(logMessages.get(LOG_UNHANDLED), ex);
+    log.error(logMessages.get(RequestContextUtils.getLocale(request), LOG_UNHANDLED), ex);
 
     return problem(HttpStatus.INTERNAL_SERVER_ERROR, CODE_INTERNAL, ERR_INTERNAL, null, request, ex, null);
   }
@@ -156,6 +199,31 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(status)
         .contentType(MediaType.APPLICATION_JSON)
         .body(body);
+  }
+
+  private ResponseEntity<ErrorResponse> requestBodyTooLarge(HttpMessageNotReadableException ex,
+      HttpServletRequest request) {
+    logRejectedRequest(request, CODE_REQUEST_BODY_TOO_LARGE);
+
+    return problem(HttpStatus.CONTENT_TOO_LARGE, CODE_REQUEST_BODY_TOO_LARGE, ERR_REQUEST_BODY_TOO_LARGE, null,
+        request, ex, null);
+  }
+
+  private void logRejectedRequest(HttpServletRequest request, String errorCode) {
+    log.warn(logMessages.get(
+        RequestContextUtils.getLocale(request),
+        LOG_REJECTED,
+        Instant.now().atOffset(ZoneOffset.UTC),
+        safeLogField(request.getRemoteAddr()),
+        errorCode));
+  }
+
+  private String safeLogField(String value) {
+    if (value == null) {
+      return "";
+    }
+
+    return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
   }
 
   private String traceOf(Throwable ex) {

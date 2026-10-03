@@ -47,8 +47,7 @@ class AnswerRepositoryImplTest {
 
   @BeforeEach
   void setUp() {
-    repository = new AnswerRepositoryImpl(new AnswerProperties(answersDirectory),
-        new RootPasswordHash(TEST_PASSWORD_HASH), MESSAGE_SOURCE);
+    repository = newRepository();
   }
 
   @Test
@@ -64,9 +63,29 @@ class AnswerRepositoryImplTest {
   }
 
   @Test
+  void shouldFindAnswerFileWhenFilenameCaseDiffers() throws IOException {
+    Files.writeString(answersDirectory.resolve("B4:2E:99:AD:B0:C0.toml"), """
+        [global]
+        root-password-hashed = "__PROXMOX_ROOT_PASSWORD_HASH__"
+        """);
+
+    byte[] result = repository.readByMac(MAC);
+
+    assertThat(new String(result, StandardCharsets.UTF_8)).contains(TEST_PASSWORD_HASH);
+  }
+
+  @Test
   void shouldThrowNotFoundWhenFileIsMissing() {
     assertThatThrownBy(() -> repository.readByMac(MAC))
         .isInstanceOf(AnswerNotFoundException.class);
+  }
+
+  @Test
+  void shouldThrowUnreadableWhenAnswersDirectoryIsMissing() {
+    AnswerRepositoryImpl missingDirectoryRepository = newRepository(answersDirectory.resolve("missing"));
+
+    assertThatThrownBy(() -> missingDirectoryRepository.readByMac(MAC))
+        .isInstanceOf(AnswerUnreadableException.class);
   }
 
   @Test
@@ -78,15 +97,32 @@ class AnswerRepositoryImplTest {
   }
 
   @Test
-  void shouldRejectAnswerFileWithoutPasswordHashPlaceholder() throws IOException {
-    Files.writeString(answersDirectory.resolve(MAC + AnswerProperties.ANSWER_FILE_EXTENSION),
-        "[global]\nkeyboard = \"en-us\"\n");
+  void shouldAllowAnswerFileWithPlainRootPasswordAndNoPlaceholder() throws IOException {
+    Files.writeString(answersDirectory.resolve(MAC + AnswerProperties.ANSWER_FILE_EXTENSION), """
+        [global]
+        keyboard = "en-us"
+        root-password = "12345678"
+        """);
+
+    byte[] result = repository.readByMac(MAC);
+
+    assertThat(new String(result, StandardCharsets.UTF_8)).contains("root-password = \"12345678\"");
+  }
+
+  @Test
+  void shouldRejectAnswerFileWithPlaceholderOutsidePasswordField() throws IOException {
+    Files.writeString(answersDirectory.resolve(MAC + AnswerProperties.ANSWER_FILE_EXTENSION), """
+        [global]
+        keyboard = "en-us"
+        root-password = "12345678"
+        note = "__PROXMOX_ROOT_PASSWORD_HASH__"
+        """);
 
     Locale locale = Locale.forLanguageTag("pt-BR");
     LocaleContextHolder.setLocale(locale);
     try {
       assertThatThrownBy(() -> repository.readByMac(MAC))
-          .isInstanceOf(InvalidAnswerTomlException.class)
+          .isInstanceOf(InvalidAnswerTemplateException.class)
           .satisfies(exception -> assertThat(exception.getCause())
               .hasMessage(MESSAGE_SOURCE.getMessage(ERROR_ANSWER_PASSWORD_PLACEHOLDER, null, locale)));
     } finally {
@@ -103,7 +139,7 @@ class AnswerRepositoryImplTest {
         """);
 
     assertThatThrownBy(() -> repository.readByMac(MAC))
-        .isInstanceOf(InvalidAnswerTomlException.class);
+        .isInstanceOf(InvalidAnswerTemplateException.class);
   }
 
   @Test
@@ -145,8 +181,7 @@ class AnswerRepositoryImplTest {
         Map.of("create", "true"))) {
       Path zipAnswersDirectory = fileSystem.getPath("/answers");
       Files.createDirectory(zipAnswersDirectory);
-      AnswerRepositoryImpl zipRepository = new AnswerRepositoryImpl(new AnswerProperties(zipAnswersDirectory),
-          new RootPasswordHash(TEST_PASSWORD_HASH), MESSAGE_SOURCE);
+      AnswerRepositoryImpl zipRepository = newRepository(zipAnswersDirectory);
 
       assertThatThrownBy(() -> zipRepository.readByMac(MAC))
           .isInstanceOf(AnswerUnreadableException.class)
@@ -169,6 +204,16 @@ class AnswerRepositoryImplTest {
     } finally {
       Files.deleteIfExists(outsideFile);
     }
+  }
+
+  private AnswerRepositoryImpl newRepository() {
+    return newRepository(answersDirectory);
+  }
+
+  private AnswerRepositoryImpl newRepository(Path directory) {
+    ProxmoxProperties properties = new ProxmoxProperties("secret", new ProxmoxProperties.Answers(directory));
+
+    return new AnswerRepositoryImpl(properties, new RootPasswordHash(TEST_PASSWORD_HASH), MESSAGE_SOURCE);
   }
 
   private static MessageSource createMessageSource() {

@@ -31,6 +31,8 @@ class AnswerServiceImpl implements AnswerService {
   private static final String OUTCOME_NOT_FOUND = "NOT_FOUND";
   private static final String OUTCOME_UNREADABLE = "UNREADABLE";
   private static final String OUTCOME_INVALID_TOML = "INVALID_TOML";
+  private static final String OUTCOME_INVALID_TEMPLATE = "INVALID_TEMPLATE";
+  private static final String OUTCOME_INTERNAL_ERROR = "INTERNAL_ERROR";
 
   private final AnswerMapper answerMapper;
   private final AnswerRepository answerRepository;
@@ -38,7 +40,7 @@ class AnswerServiceImpl implements AnswerService {
 
   /** Finds the first matching answer file and records request audit metadata. */
   @Override
-  public byte[] findAnswer(AnswerRequest request, String clientAddress) {
+  public byte[] findAnswer(AnswerRequest request, String clientAddress, Locale locale) {
     Instant startedAt = Instant.now();
     String macMetadata = requestMacMetadata(request);
     String normalizedMac = null;
@@ -54,7 +56,7 @@ class AnswerServiceImpl implements AnswerService {
 
       for (String mac : macs) {
         normalizedMac = mac;
-        Optional<byte[]> content = readAnswer(mac);
+        Optional<byte[]> content = readAnswer(mac, locale);
         if (content.isPresent()) {
           return content.get();
         }
@@ -78,59 +80,69 @@ class AnswerServiceImpl implements AnswerService {
       outcome = OUTCOME_INVALID_TOML;
       errorCode = ex.getErrorCode();
       throw ex;
+    } catch (InvalidAnswerTemplateException ex) {
+      outcome = OUTCOME_INVALID_TEMPLATE;
+      errorCode = ex.getErrorCode();
+      throw ex;
+    } catch (RuntimeException ex) {
+      outcome = OUTCOME_INTERNAL_ERROR;
+      errorCode = OUTCOME_INTERNAL_ERROR;
+      throw ex;
     } finally {
-      recordAudit(startedAt, clientAddress, request, macMetadata, normalizedMac, outcome, errorCode);
+      recordAudit(new AuditContext(startedAt, clientAddress, request, macMetadata, normalizedMac, outcome, errorCode,
+          locale));
     }
   }
 
-  private Optional<byte[]> readAnswer(String mac) {
+  private Optional<byte[]> readAnswer(String mac, Locale locale) {
     try {
       byte[] content = answerRepository.readByMac(mac);
-      traceMacAttempt(mac, MAC_HIT);
+      traceMacAttempt(locale, mac, MAC_HIT);
 
       return Optional.of(content);
     } catch (AnswerNotFoundException _) {
-      traceMacAttempt(mac, MAC_MISS);
+      traceMacAttempt(locale, mac, MAC_MISS);
 
       return Optional.empty();
     }
   }
 
-  private void traceMacAttempt(String mac, String result) {
+  private void traceMacAttempt(Locale locale, String mac, String result) {
     if (log.isDebugEnabled()) {
-      log.debug(logMessages.get(LOG_MAC_ATTEMPT, safeLogField(mac), result));
+      log.debug(logMessages.get(locale, LOG_MAC_ATTEMPT, safeLogField(mac), result));
     }
   }
 
-  private void recordAudit(Instant startedAt, String clientAddress, AnswerRequest request, String macMetadata,
-      String normalizedMac, String outcome, String errorCode) {
-    long latencyMs = Duration.between(startedAt, Instant.now()).toMillis();
-    String filename = normalizedMac == null ? null : normalizedMac + AnswerProperties.ANSWER_FILE_EXTENSION;
-    AnswerRequest.Product product = request.product();
-    AnswerRequest.Iso iso = request.iso();
-    AnswerRequest.Dmi dmi = request.dmi();
+  private void recordAudit(AuditContext context) {
+    long latencyMs = Duration.between(context.startedAt(), Instant.now()).toMillis();
+    String filename = context.normalizedMac() == null ? null
+        : context.normalizedMac() + AnswerProperties.ANSWER_FILE_EXTENSION;
+    AnswerRequest.Product product = context.request().product();
+    AnswerRequest.Iso iso = context.request().iso();
+    AnswerRequest.Dmi dmi = context.request().dmi();
     AnswerRequest.SystemInfo system = dmi == null ? null : dmi.system();
     AnswerRequest.Baseboard baseboard = dmi == null ? null : dmi.baseboard();
     AnswerRequest.Chassis chassis = dmi == null ? null : dmi.chassis();
     log.info(logMessages.get(
+        context.locale(),
         LOG_AUDIT,
-        startedAt.atOffset(ZoneOffset.UTC),
-        safeLogField(clientAddress),
+        context.startedAt().atOffset(ZoneOffset.UTC),
+        safeLogField(context.clientAddress()),
         safeLogField(product == null ? null : product.product()),
         safeLogField(product == null ? null : product.fullname()),
         safeLogField(iso == null ? null : iso.release()),
         safeLogField(iso == null ? null : iso.isorelease()),
-        safeLogField(request.schema() == null ? null : request.schema().version()),
+        safeLogField(context.request().schema() == null ? null : context.request().schema().version()),
         safeLogField(system == null ? null : system.serial()),
         safeLogField(system == null ? null : system.uuid()),
         safeLogField(system == null ? null : system.name()),
         safeLogField(baseboard == null ? null : baseboard.serial()),
         safeLogField(chassis == null ? null : chassis.serial()),
-        safeLogField(macMetadata),
-        safeLogField(normalizedMac),
+        safeLogField(context.macMetadata()),
+        safeLogField(context.normalizedMac()),
         safeLogField(filename),
-        outcome,
-        errorCode,
+        context.outcome(),
+        context.errorCode(),
         latencyMs));
   }
 
@@ -162,6 +174,10 @@ class AnswerServiceImpl implements AnswerService {
 
     // Replace control characters and line/paragraph separators with underscores.
     return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
+  }
+
+  private record AuditContext(Instant startedAt, String clientAddress, AnswerRequest request, String macMetadata,
+      String normalizedMac, String outcome, String errorCode, Locale locale) {
   }
 
 }

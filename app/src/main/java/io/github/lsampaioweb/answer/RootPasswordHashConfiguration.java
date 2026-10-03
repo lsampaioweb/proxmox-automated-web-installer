@@ -34,11 +34,17 @@ class RootPasswordHashConfiguration {
           ? "crypt_gensalt_rn"
           : method.getName()));
 
+  /**
+   * Hashes {@code PROXMOX_ROOT_PASSWORD} once at startup.
+   * <p>
+   * {@code crypt(3)} is not thread-safe; keep this call on the startup path only.
+   */
   @Bean
-  RootPasswordHash rootPasswordHash(@Value("${proxmox.root-password}") String password, MessageSource messageSource,
+  RootPasswordHash rootPasswordHash(ProxmoxProperties proxmoxProperties, MessageSource messageSource,
       @Value("${spring.messages.default-locale:en}") String defaultLocaleTag) {
     Locale defaultLocale = Locale.forLanguageTag(defaultLocaleTag);
-    if (password.isBlank()) {
+    String password = proxmoxProperties.rootPassword();
+    if (password == null || password.isBlank()) {
       throw new IllegalStateException(messageSource.getMessage(ERROR_ROOT_PASSWORD_REQUIRED, null, defaultLocale));
     }
 

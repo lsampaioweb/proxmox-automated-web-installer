@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class AnswerServiceImplTest {
   private static final String FIRST_FILENAME = FIRST_MAC + AnswerProperties.ANSWER_FILE_EXTENSION;
   private static final String SECOND_FILENAME = SECOND_MAC + AnswerProperties.ANSWER_FILE_EXTENSION;
   private static final String LOG_AUDIT = "log.answer.audit";
+  private static final Locale REQUEST_LOCALE = Locale.ENGLISH;
 
   @Mock
   private AnswerMapper answerMapper;
@@ -45,8 +47,7 @@ class AnswerServiceImplTest {
   @BeforeEach
   void setUp() {
     answerService = new AnswerServiceImpl(answerMapper, answerRepository, logMessages);
-    when(logMessages.get(eq(LOG_AUDIT), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
-        any(), any(), any(), any(), any(), any(), any())).thenReturn("audit");
+    when(logMessages.get(any(Locale.class), eq(LOG_AUDIT), any(Object[].class))).thenReturn("audit");
   }
 
   @Test
@@ -56,12 +57,24 @@ class AnswerServiceImplTest {
     when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC, SECOND_MAC));
     when(answerRepository.readByMac(FIRST_MAC)).thenReturn(toml);
 
-    byte[] result = answerService.findAnswer(request, CLIENT);
+    byte[] result = answerService.findAnswer(request, CLIENT, REQUEST_LOCALE);
 
     assertThat(result).isEqualTo(toml);
     verify(answerRepository).readByMac(FIRST_MAC);
     verify(answerRepository, never()).readByMac(SECOND_MAC);
     verifyAudit(FIRST_MAC, FIRST_FILENAME, "SUCCESS", "");
+  }
+
+  @Test
+  void shouldResolveAuditLogUsingRequestLocale() {
+    Locale requestLocale = Locale.forLanguageTag("pt-BR");
+    AnswerRequest request = requestWith(FIRST_MAC);
+    when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC));
+    when(answerRepository.readByMac(FIRST_MAC)).thenReturn("[global]".getBytes(StandardCharsets.UTF_8));
+
+    answerService.findAnswer(request, CLIENT, requestLocale);
+
+    verify(logMessages).get(eq(requestLocale), eq(LOG_AUDIT), any(Object[].class));
   }
 
   @Test
@@ -72,7 +85,7 @@ class AnswerServiceImplTest {
     when(answerRepository.readByMac(FIRST_MAC)).thenThrow(new AnswerNotFoundException());
     when(answerRepository.readByMac(SECOND_MAC)).thenReturn(toml);
 
-    byte[] result = answerService.findAnswer(request, CLIENT);
+    byte[] result = answerService.findAnswer(request, CLIENT, REQUEST_LOCALE);
 
     assertThat(result).isEqualTo(toml);
     verifyAudit(SECOND_MAC, SECOND_FILENAME, "SUCCESS", "");
@@ -83,7 +96,7 @@ class AnswerServiceImplTest {
     AnswerRequest request = requestWith("  ");
     when(answerMapper.normalizedMacs(request)).thenReturn(List.of());
 
-    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT))
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT, REQUEST_LOCALE))
         .isInstanceOf(InvalidAnswerRequestException.class);
 
     verifyAudit("", "", "BAD_REQUEST", "ANSWER_MAC_REQUIRED");
@@ -95,7 +108,7 @@ class AnswerServiceImplTest {
     AnswerRequest request = requestWith(FIRST_MAC, malformedMac);
     when(answerMapper.normalizedMacs(request)).thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
 
-    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT))
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT, REQUEST_LOCALE))
         .isInstanceOf(InvalidAnswerRequestException.class);
 
     verify(answerRepository, never()).readByMac(FIRST_MAC);
@@ -103,7 +116,7 @@ class AnswerServiceImplTest {
     verifyAudit("", "", "BAD_REQUEST", "ANSWER_MAC_INVALID");
 
     ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
-    verify(logMessages).get(eq(LOG_AUDIT), captor.capture());
+    verify(logMessages).get(eq(REQUEST_LOCALE), eq(LOG_AUDIT), captor.capture());
     assertThat(captor.getValue()[12]).isEqualTo(FIRST_MAC + "," + malformedMac);
     assertThat(captor.getValue()[13]).isEqualTo("");
     assertThat(captor.getValue()[14]).isEqualTo("");
@@ -116,7 +129,7 @@ class AnswerServiceImplTest {
     when(answerRepository.readByMac(FIRST_MAC)).thenThrow(new AnswerNotFoundException());
     when(answerRepository.readByMac(SECOND_MAC)).thenThrow(new AnswerNotFoundException());
 
-    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT))
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT, REQUEST_LOCALE))
         .isInstanceOf(AnswerNotFoundException.class);
 
     verifyAudit(SECOND_MAC, SECOND_FILENAME, "NOT_FOUND", "ANSWER_NOT_FOUND");
@@ -129,11 +142,23 @@ class AnswerServiceImplTest {
     when(answerRepository.readByMac(FIRST_MAC))
         .thenThrow(new AnswerUnreadableException(new RuntimeException("io")));
 
-    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT))
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT, REQUEST_LOCALE))
         .isInstanceOf(AnswerUnreadableException.class);
 
     verify(answerRepository, never()).readByMac(SECOND_MAC);
     verifyAudit(FIRST_MAC, FIRST_FILENAME, "UNREADABLE", "ANSWER_UNREADABLE");
+  }
+
+  @Test
+  void shouldAuditUnexpectedRuntimeFailureAsInternalError() {
+    AnswerRequest request = requestWith(FIRST_MAC);
+    when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC));
+    when(answerRepository.readByMac(FIRST_MAC)).thenThrow(new IllegalStateException("unexpected"));
+
+    assertThatThrownBy(() -> answerService.findAnswer(request, CLIENT, REQUEST_LOCALE))
+        .isInstanceOf(IllegalStateException.class);
+
+    verifyAudit(FIRST_MAC, FIRST_FILENAME, "INTERNAL_ERROR", "INTERNAL_ERROR");
   }
 
   @Test
@@ -143,10 +168,10 @@ class AnswerServiceImplTest {
     when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC));
     when(answerRepository.readByMac(FIRST_MAC)).thenReturn(toml);
 
-    answerService.findAnswer(request, CLIENT);
+    answerService.findAnswer(request, CLIENT, REQUEST_LOCALE);
 
     ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
-    verify(logMessages).get(eq(LOG_AUDIT), captor.capture());
+    verify(logMessages).get(eq(REQUEST_LOCALE), eq(LOG_AUDIT), captor.capture());
     assertThat(captor.getAllValues())
         .flatExtracting(List::of)
         .doesNotContain((Object) toml)
@@ -158,16 +183,16 @@ class AnswerServiceImplTest {
     AnswerRequest request = new AnswerRequest(null,
         new AnswerRequest.Product("Proxmox\nforged-outcome=SUCCESS", "pve\r\nforged-field=value"),
         null,
-        new AnswerRequest.Dmi(new AnswerRequest.SystemInfo("serial\u2028forged-field=value", null, null, null),
+        new AnswerRequest.Dmi(new AnswerRequest.SystemInfo("serial\u2028forged-field=value", null, null),
             null, null),
-        List.of(new NetworkInterfaceRequest(FIRST_MAC, null)));
+        List.of(new NetworkInterfaceRequest(FIRST_MAC)));
     when(answerMapper.normalizedMacs(request)).thenReturn(List.of(FIRST_MAC));
     when(answerRepository.readByMac(FIRST_MAC)).thenReturn("[global]".getBytes(StandardCharsets.UTF_8));
 
-    answerService.findAnswer(request, CLIENT);
+    answerService.findAnswer(request, CLIENT, REQUEST_LOCALE);
 
     ArgumentCaptor<Object[]> captor = ArgumentCaptor.forClass(Object[].class);
-    verify(logMessages).get(eq(LOG_AUDIT), captor.capture());
+    verify(logMessages).get(eq(REQUEST_LOCALE), eq(LOG_AUDIT), captor.capture());
     List<String> loggedFields = Arrays.stream(captor.getValue())
         .filter(String.class::isInstance)
         .map(String.class::cast)
@@ -179,31 +204,21 @@ class AnswerServiceImplTest {
   }
 
   private void verifyAudit(String mac, String filename, String outcome, String errorCode) {
-    verify(logMessages).get(
-        eq(LOG_AUDIT),
-        any(),
-        eq(CLIENT),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        any(),
-        eq(mac),
-        eq(filename),
-        eq(outcome),
-        eq(errorCode),
-        any());
+    ArgumentCaptor<Object[]> auditFields = ArgumentCaptor.forClass(Object[].class);
+    verify(logMessages).get(eq(REQUEST_LOCALE), eq(LOG_AUDIT), auditFields.capture());
+    Object[] fields = auditFields.getValue();
+
+    assertThat(fields).hasSize(18);
+    assertThat(fields[1]).isEqualTo(CLIENT);
+    assertThat(fields[13]).isEqualTo(mac);
+    assertThat(fields[14]).isEqualTo(filename);
+    assertThat(fields[15]).isEqualTo(outcome);
+    assertThat(fields[16]).isEqualTo(errorCode);
   }
 
   private AnswerRequest requestWith(String... macs) {
     List<NetworkInterfaceRequest> interfaces = Arrays.stream(macs)
-        .map(mac -> new NetworkInterfaceRequest(mac, null))
+        .map(NetworkInterfaceRequest::new)
         .toList();
 
     return new AnswerRequest(null, null, null, null, interfaces);

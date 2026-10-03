@@ -2,7 +2,7 @@
 
 **Project:** Proxmox Web Installer (automated Proxmox installation answer server)
 **Status:** Design complete
-**Last updated:** 2026-09-26
+**Last updated:** 2026-09-29
 
 ---
 
@@ -10,7 +10,7 @@
 
 The Proxmox Web Installer is a lightweight Spring Boot service that dynamically provides Proxmox automated-installation TOML answer files based on MAC address lookups. It replaces manual or static configuration with intelligent, filesystem-based answer file management.
 
-The service is intentionally minimal: stateless, database-free, and focused on a single responsibility. It runs internally on the homelab network only.
+The service is intentionally minimal: mostly stateless, database-free, and focused on a single responsibility. It runs internally on the homelab network only.
 
 ## ADRs
 
@@ -27,7 +27,7 @@ The service is intentionally minimal: stateless, database-free, and focused on a
 - Internal homelab deployment only
 - No authentication or authorization
 - Filesystem-based answer file storage (no database)
-- Stateless design (no persistent state)
+- Stateless design (no persistent answer-file cache)
 - MAC address-based answer file lookup across every installer-reported NIC
 - Spring Boot 4+ with Java 25
 
@@ -36,7 +36,7 @@ The service is intentionally minimal: stateless, database-free, and focused on a
 1. **Simplicity over features:** Single responsibility — serve answer files dynamically
 2. **Stateless operation:** No database, no persistent state, no complex dependencies
 3. **Filesystem as source:** Answer-template changes are direct filesystem edits; the root password is injected and hashed at runtime
-4. **Internal only:** Network boundary enforcement; TLS recommended for transport
+4. **Internal only:** Network boundary enforcement; TLS via reverse proxy by default
 5. **Small runtime footprint:** One JVM service with the system `libcrypt` library for yescrypt hashing
 
 ## Architecture

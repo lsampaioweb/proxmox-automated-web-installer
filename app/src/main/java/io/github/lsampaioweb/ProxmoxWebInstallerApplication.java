@@ -3,13 +3,14 @@ package io.github.lsampaioweb;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import io.github.lsampaioweb.answer.AnswerProperties;
+
+import io.github.lsampaioweb.answer.ProxmoxProperties;
 
 /**
  * Starts the Proxmox web installer application.
  */
 @SpringBootApplication
-@EnableConfigurationProperties(AnswerProperties.class)
+@EnableConfigurationProperties(ProxmoxProperties.class)
 public class ProxmoxWebInstallerApplication {
 
   /**

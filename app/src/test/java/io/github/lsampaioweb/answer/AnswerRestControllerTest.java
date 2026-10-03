@@ -1,33 +1,50 @@
 package io.github.lsampaioweb.answer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Locale;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpInputMessage;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import io.github.lsampaioweb.core.exception.GlobalExceptionHandler;
+import io.github.lsampaioweb.core.exception.RequestBodySizeLimitAdvice;
 import io.github.lsampaioweb.core.i18n.I18nLocaleResolverConfig;
 import io.github.lsampaioweb.core.i18n.LogMessages;
 import io.github.lsampaioweb.ProxmoxWebInstallerApplication;
 
 @WebMvcTest(AnswerRestController.class)
 @ContextConfiguration(classes = ProxmoxWebInstallerApplication.class)
-@Import({ GlobalExceptionHandler.class, LogMessages.class, I18nLocaleResolverConfig.class })
+@Import({ GlobalExceptionHandler.class, I18nLocaleResolverConfig.class })
+@TestPropertySource(properties = {
+    "proxmox.root-password=test-root-password",
+    "proxmox.answers.directory=./answers"
+})
 class AnswerRestControllerTest {
 
   private static final MediaType APPLICATION_TOML = MediaType.parseMediaType("application/toml");
@@ -81,17 +98,26 @@ class AnswerRestControllerTest {
   @MockitoBean
   private AnswerService answerService;
 
+  @MockitoBean
+  private LogMessages logMessages;
+
   @Autowired
   AnswerRestControllerTest(MockMvc mockMvc) {
     this.mockMvc = mockMvc;
   }
 
+  @BeforeEach
+  void setUp() {
+    when(logMessages.get(any(Locale.class), anyString(), any(Object[].class))).thenReturn("rejected");
+  }
+
   @Test
   void shouldIgnoreUnknownProductFieldsAndReturnTomlBytesForValidLookup() throws Exception {
     byte[] toml = "[global]\nkeyboard = \"en-us\"\n".getBytes();
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString())).thenReturn(toml);
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class))).thenReturn(toml);
 
     mockMvc.perform(post("/answer")
+        .header("Accept-Language", "pt-BR")
         .contentType(MediaType.APPLICATION_JSON)
         .content(VALID_BODY))
         .andExpect(status().isOk())
@@ -99,15 +125,17 @@ class AnswerRestControllerTest {
         .andExpect(content().bytes(toml));
 
     ArgumentCaptor<AnswerRequest> requestCaptor = ArgumentCaptor.forClass(AnswerRequest.class);
-    verify(answerService).findAnswer(requestCaptor.capture(), anyString());
+    ArgumentCaptor<Locale> localeCaptor = ArgumentCaptor.forClass(Locale.class);
+    verify(answerService).findAnswer(requestCaptor.capture(), anyString(), localeCaptor.capture());
     assertThat(requestCaptor.getValue().product())
         .isEqualTo(new AnswerRequest.Product("Proxmox VE", "pve"));
+    assertThat(localeCaptor.getValue()).isEqualTo(Locale.forLanguageTag("pt-BR"));
   }
 
   @Test
   void shouldAcceptUppercaseMacInRequestBody() throws Exception {
     byte[] toml = "ok = true\n".getBytes();
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString())).thenReturn(toml);
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class))).thenReturn(toml);
 
     mockMvc.perform(post("/answer")
         .contentType(MediaType.APPLICATION_JSON)
@@ -134,6 +162,25 @@ class AnswerRestControllerTest {
   }
 
   @Test
+  void shouldSanitizeRemoteAddressInRejectionLog() throws Exception {
+    mockMvc.perform(post("/answer")
+        .header("Accept-Language", "pt-BR")
+        .with(request -> {
+          request.setRemoteAddr("127.0.0.1\nforged=1\u2028next");
+          return request;
+        })
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{ not-json"))
+        .andExpect(status().isBadRequest());
+
+    ArgumentCaptor<Locale> localeCaptor = ArgumentCaptor.forClass(Locale.class);
+    ArgumentCaptor<Object[]> logFields = ArgumentCaptor.forClass(Object[].class);
+    verify(logMessages).get(localeCaptor.capture(), eq("log.request.rejected"), logFields.capture());
+    assertThat(localeCaptor.getValue()).isEqualTo(Locale.forLanguageTag("pt-BR"));
+    assertThat(logFields.getValue()[1]).isEqualTo("127.0.0.1_forged=1_next");
+  }
+
+  @Test
   void shouldLocalizeInvalidJsonMessageForBrazilianPortuguese() throws Exception {
     mockMvc.perform(post("/answer")
         .contentType(MediaType.APPLICATION_JSON)
@@ -141,6 +188,21 @@ class AnswerRestControllerTest {
         .content("{ not-json"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("O corpo da requisição não é um JSON válido."));
+  }
+
+  @Test
+  void shouldReturn413WhenRequestBodyExceedsOneMebibyte() throws Exception {
+    byte[] oversizedBody = new byte[1024 * 1024 + 1];
+
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Accept-Language", "pt-BR")
+        .content(oversizedBody))
+        .andExpect(status().is(413))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.errorCode").value("REQUEST_BODY_TOO_LARGE"))
+        .andExpect(jsonPath("$.message")
+            .value("O corpo da requisição excede o tamanho máximo permitido de 1 MiB."));
   }
 
   @Test
@@ -157,7 +219,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldReturn400WhenNoUsableMacIsPresent() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(new InvalidAnswerRequestException());
 
     mockMvc.perform(post("/answer")
@@ -170,7 +232,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldReturnLocalized400ForMalformedMac() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
 
     mockMvc.perform(post("/answer")
@@ -184,7 +246,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldLocalizeMalformedMacErrorForBrazilianPortuguese() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(InvalidAnswerRequestException.forMalformedMacAddress());
 
     mockMvc.perform(post("/answer")
@@ -198,7 +260,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldReturn404WhenAnswerFileIsMissing() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(new AnswerNotFoundException());
 
     mockMvc.perform(post("/answer")
@@ -211,7 +273,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldLocalizeDomainErrorMessageForBrazilianPortuguese() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(new AnswerNotFoundException());
 
     mockMvc.perform(post("/answer")
@@ -226,7 +288,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldReturn500WhenAnswerFileIsUnreadable() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(new AnswerUnreadableException(new RuntimeException("io")));
 
     mockMvc.perform(post("/answer")
@@ -239,7 +301,7 @@ class AnswerRestControllerTest {
 
   @Test
   void shouldReturn500WhenAnswerFileIsInvalidToml() throws Exception {
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString()))
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
         .thenThrow(new InvalidAnswerTomlException(new RuntimeException("toml")));
 
     mockMvc.perform(post("/answer")
@@ -251,16 +313,56 @@ class AnswerRestControllerTest {
   }
 
   @Test
-  void shouldDelegateLookupToService() throws Exception {
-    byte[] toml = "ok = true\n".getBytes();
-    when(answerService.findAnswer(any(AnswerRequest.class), anyString())).thenReturn(toml);
+  void shouldReturn500WhenAnswerTemplateIsInvalid() throws Exception {
+    when(answerService.findAnswer(any(AnswerRequest.class), anyString(), any(Locale.class)))
+        .thenThrow(new InvalidAnswerTemplateException(new RuntimeException("template")));
 
     mockMvc.perform(post("/answer")
         .contentType(MediaType.APPLICATION_JSON)
         .content(VALID_BODY))
-        .andExpect(status().isOk());
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.errorCode").value("ANSWER_TEMPLATE_INVALID"));
+  }
 
-    verify(answerService).findAnswer(any(AnswerRequest.class), anyString());
+  @Test
+  void shouldReturn405ForUnsupportedMethod() throws Exception {
+    mockMvc.perform(get("/answer")
+        .header("Accept-Language", "en"))
+        .andExpect(status().isMethodNotAllowed())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.errorCode").value("METHOD_NOT_ALLOWED"));
+  }
+
+  @Test
+  void shouldReturn415ForUnsupportedMediaType() throws Exception {
+    mockMvc.perform(post("/answer")
+        .contentType(MediaType.TEXT_PLAIN)
+        .header("Accept-Language", "en")
+        .content("not-json"))
+        .andExpect(status().isUnsupportedMediaType())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.errorCode").value("UNSUPPORTED_MEDIA_TYPE"));
+  }
+
+  @Test
+  void shouldRejectOversizedBodyWithoutContentLength() {
+    byte[] oversizedBody = new byte[1024 * 1024 + 1];
+    HttpInputMessage inputMessage = new HttpInputMessage() {
+
+      @Override
+      public InputStream getBody() {
+        return new ByteArrayInputStream(oversizedBody);
+      }
+
+      @Override
+      public HttpHeaders getHeaders() {
+        return new HttpHeaders();
+      }
+
+    };
+
+    assertThatThrownBy(() -> new RequestBodySizeLimitAdvice().beforeBodyRead(inputMessage, null, null, null))
+        .isInstanceOf(IOException.class);
   }
 
 }

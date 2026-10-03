@@ -2,15 +2,20 @@
 
 These files are the runtime store for `POST /answer`. Each file name is
 `mac_bind[0].mac_address` from `03-proxmox-cluster/ansible/host_vars`.
+Filenames may use any hex letter casing; the service matches them
+case-insensitively. Prefer lowercase names for consistency with the seeded files.
 The service tries every MAC in the installer POST until one file matches.
 
-Each file is a Proxmox answer template. The committed
-`__PROXMOX_ROOT_PASSWORD_HASH__` token is replaced in memory with a yescrypt
-hash generated from `PROXMOX_ROOT_PASSWORD` when the application starts. Source
-files are never modified, and the hash/password are never logged.
+Each file is a Proxmox answer template:
 
-Bond/VLAN layout stays with Ansible after install; the installer configures its
-initial network interface.
+- `root-password-hashed` uses `__PROXMOX_ROOT_PASSWORD_HASH__`, replaced in memory
+- `[network.interface-name-pinning]` maps every `mac_bind` NIC from Ansible (PVE 9.1+)
+- `disk-list = ["sda"]` is a placeholder — replace before a real install
+
+Source files are never modified. Secrets are never logged.
+
+Bond/VLAN layout stays with Ansible after install; the installer configures the
+initial network interface and pinned names.
 
 ## Configure the root password
 
@@ -29,13 +34,20 @@ export PROXMOX_ROOT_PASSWORD
 SPRING_PROFILES_ACTIVE=development mvn spring-boot:run
 ```
 
-All answer files use the same password and startup-generated hash. A new
-random salt is generated at each application startup. Restart the application
+All answer files that use the password placeholder share the same startup hash.
+A new random salt is generated at each application startup. Restart the application
 after changing the environment value.
 
-## Configure `disk-list`
+Templates may instead ship a finished `root-password` or `root-password-hashed`
+value and omit the placeholder. Do not set both keys.
 
-Set the OS install disk for that host. On an already-running Proxmox node:
+To allow Ansible SSH access after install, add `root-ssh-keys` directly in the
+host answer file (no service-side injection).
+
+## Configure disks
+
+`disk-list = ["sda"]` is not safe for production installs. On an already-running
+Proxmox node:
 
 ```bash
 lsblk -d -o NAME,SIZE,MODEL,SERIAL
@@ -43,22 +55,20 @@ lsblk -d -o NAME,SIZE,MODEL,SERIAL
 proxmox-auto-install-assistant device-info -t disk
 ```
 
-Edit each host answer file:
+Prefer a unique filter and remove `disk-list`:
 
 ```toml
 [disk-setup]
 filesystem = "ext4"
-disk-list = ["nvme0n1"]
+filter.ID_SERIAL = "YOUR_DISK_SERIAL*"
 ```
 
-Use the real device name for that host (`sda`, `nvme0n1`, …). Prefer a
-unique filter (for example `filter.ID_SERIAL = "..."`) when disk names are
-not stable across boots.
+Only use `disk-list` when the device name is known and stable.
 
 ## Validate rendered answer files
 
-Committed templates contain the placeholder and are not ready to install. Validate
-the rendered answer returned by the service, not the template on disk.
+Committed templates contain the password placeholder and are not ready to install.
+Validate the rendered answer returned by the service, not the template on disk.
 
 From `app/`, with the service running and the appropriate host MAC:
 
@@ -72,6 +82,10 @@ rm /tmp/proxmox-answer.toml
 
 Repeat for each host file. Protect and remove the temporary rendered answer
 because it contains the real password hash.
+
+`mvn test` also renders every committed template. When
+`proxmox-auto-install-assistant` is on `PATH`, that test runs `validate-answer`
+against each rendered file when the installed tool is new enough for the schema.
 
 ## Home
 

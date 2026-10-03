@@ -15,9 +15,9 @@ class AnswerMapperTest {
   @Test
   void shouldReturnEveryUsableMacInRequestOrder() {
     AnswerRequest request = new AnswerRequest(null, null, null, null, List.of(
-        new NetworkInterfaceRequest("  B4:2E:99:AD:B0:C0  ", "enp1board0"),
-        new NetworkInterfaceRequest("  ", null),
-        new NetworkInterfaceRequest("18:c0:4d:f1:fe:c9", "enp1board0")));
+        new NetworkInterfaceRequest("  B4:2E:99:AD:B0:C0  "),
+        new NetworkInterfaceRequest("  "),
+        new NetworkInterfaceRequest("18:c0:4d:f1:fe:c9")));
 
     assertThat(mapper.normalizedMacs(request))
         .containsExactly("b4:2e:99:ad:b0:c0", "18:c0:4d:f1:fe:c9");
@@ -26,7 +26,7 @@ class AnswerMapperTest {
   @Test
   void shouldIgnoreMissingAndBlankMacs() {
     AnswerRequest request = new AnswerRequest(null, null, null, null,
-        Arrays.asList(null, new NetworkInterfaceRequest(null, null), new NetworkInterfaceRequest("  ", null)));
+        Arrays.asList(null, new NetworkInterfaceRequest(null), new NetworkInterfaceRequest("  ")));
 
     assertThat(mapper.normalizedMacs(request)).isEmpty();
     assertThat(mapper.normalizedMacs(new AnswerRequest(null, null, null, null, null))).isEmpty();
@@ -41,8 +41,8 @@ class AnswerMapperTest {
         "b4-2e-99-ad-b0-c0",
         "b４:2e:99:ad:b0:c0")) {
       AnswerRequest request = new AnswerRequest(null, null, null, null, List.of(
-          new NetworkInterfaceRequest("b4:2e:99:ad:b0:c0", null),
-          new NetworkInterfaceRequest(malformedMac, null)));
+          new NetworkInterfaceRequest("b4:2e:99:ad:b0:c0"),
+          new NetworkInterfaceRequest(malformedMac)));
 
       assertThatThrownBy(() -> mapper.normalizedMacs(request))
           .isInstanceOfSatisfying(InvalidAnswerRequestException.class,

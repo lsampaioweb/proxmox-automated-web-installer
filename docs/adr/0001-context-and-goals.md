@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-08
-**Updated:** 2026-09-20
+**Updated:** 2026-09-29
 **Project:** Proxmox Web Installer
 
 ## Context
@@ -13,11 +13,11 @@ The internal homelab needs a small Spring Boot service that answers Proxmox auto
 
 Build the service with Spring Boot 4+ and Java 25 using the base package `io.github.lsampaioweb`. The service has one responsibility: resolve and return the Proxmox automated-installation TOML answer file for the requesting node.
 
-The deployment is internal to the homelab. The application has no authentication and exposes no CRUD operations. TLS may be terminated by the application or by an internal reverse proxy; application-level authentication remains disabled.
+The deployment is internal to the homelab. The application has no authentication and exposes no CRUD operations. TLS terminates at an internal reverse proxy by default; `server.ssl.*` may be configured only when the JVM itself must terminate TLS.
 
 ## Consequences
 
-The service is intentionally narrow and stateless. Answer-file changes are filesystem changes rather than application releases. Network exposure must remain limited to the internal deployment boundary, with TLS recommended for transport protection.
+The service is intentionally narrow and mostly stateless. Answer-file changes are filesystem changes rather than application releases. Network exposure must remain limited to the internal deployment boundary, with TLS recommended for transport protection.
 
 ## Out of scope
 
@@ -25,6 +25,7 @@ The service is intentionally narrow and stateless. Answer-file changes are files
 - User accounts, application authentication, or authorization workflows.
 - Database persistence.
 - Create, update, or delete endpoints.
+- Post-installation webhook receivers.
 - Proxmox installation orchestration beyond serving the answer file.
 
 ## Alternatives Considered

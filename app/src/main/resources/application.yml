@@ -16,10 +16,11 @@ spring:
 
 logging:
   config: "classpath:log/logback-spring.xml"
-  file:
-    max-size: "10MB"
-    max-history: "7"
-    total-size-cap: "1GB"
+  logback:
+    rollingpolicy:
+      max-file-size: "10MB"
+      max-history: "7"
+      total-size-cap: "1GB"
 
 management:
   endpoints:

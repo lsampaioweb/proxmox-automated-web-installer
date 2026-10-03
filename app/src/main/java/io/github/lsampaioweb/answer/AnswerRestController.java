@@ -1,5 +1,7 @@
 package io.github.lsampaioweb.answer;
 
+import java.util.Locale;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
@@ -8,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.RequestContextUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
@@ -32,7 +35,8 @@ class AnswerRestController {
    */
   @PostMapping("/answer")
   public ResponseEntity<byte[]> findAnswer(@Valid @RequestBody AnswerRequest request, HttpServletRequest httpRequest) {
-    byte[] answerFile = answerService.findAnswer(request, httpRequest.getRemoteAddr());
+    Locale locale = RequestContextUtils.getLocale(httpRequest);
+    byte[] answerFile = answerService.findAnswer(request, httpRequest.getRemoteAddr(), locale);
 
     return ResponseEntity.ok()
         .contentType(APPLICATION_TOML)

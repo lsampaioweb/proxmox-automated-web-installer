@@ -1,18 +1,18 @@
 package io.github.lsampaioweb.answer;
 
-import java.nio.file.Path;
 import java.util.regex.Pattern;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 /**
- * Filesystem location of Proxmox answer files.
- *
- * @param directory directory that contains answer files
+ * Shared answer-file naming and MAC syntax constants.
  */
-@ConfigurationProperties(prefix = "proxmox.answers")
-public record AnswerProperties(Path directory) {
+public final class AnswerProperties {
 
   static final Pattern MAC_ADDRESS_PATTERN = Pattern.compile("[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}");
-  static final String ANSWER_FILE_EXTENSION = ".toml";
+
+  /** Canonical answer-file suffix required by this service. */
+  public static final String ANSWER_FILE_EXTENSION = ".toml";
+
+  private AnswerProperties() {
+  }
+
 }

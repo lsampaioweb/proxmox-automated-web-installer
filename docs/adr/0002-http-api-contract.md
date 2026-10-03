@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-08
-**Updated:** 2026-09-26
+**Updated:** 2026-09-29
 **Project:** Proxmox Web Installer
 
 ## Context
@@ -13,15 +13,33 @@ Proxmox Automated Installation calls an HTTP source with `POST` JSON that includ
 
 Expose exactly one public endpoint: `POST /answer`.
 
-The request follows the Proxmox Automated Installation HTTP source protocol. Unknown keys, including `enable_btrfs`, are ignored so a newer installer document still resolves an answer file. Request fields are not required to be retained in audit records. Lookup walks `network_interfaces` in request order. A null, missing, or blank `mac` value is skipped, preserving existing behavior. Trim each nonblank value, then require exactly six two-digit ASCII hexadecimal octets separated by five colons (`XX:XX:XX:XX:XX:XX`). If any nonblank MAC is malformed, reject the entire request before filesystem lookup with HTTP 400 and error code `ANSWER_MAC_INVALID`; do not continue with other interfaces. Otherwise, normalize each MAC to lowercase and use the first MAC whose `<mac>.toml` file exists. Matching is case-insensitive. If all MAC values are missing or blank, return HTTP 400 with the existing `ANSWER_MAC_REQUIRED` error code.
+The request follows the Proxmox Automated Installation HTTP source protocol. Unknown keys, including `enable_btrfs`, are ignored so a newer installer document still resolves an answer file. Lookup walks `network_interfaces` in request order. A null, missing, or blank `mac` value is skipped. Trim each nonblank value, then require exactly six two-digit ASCII hexadecimal octets separated by five colons (`XX:XX:XX:XX:XX:XX`). If any nonblank MAC is malformed, reject the entire request before filesystem lookup with HTTP 400 and error code `ANSWER_MAC_INVALID`. Otherwise, normalize each MAC to lowercase and use the first MAC whose answer file exists. Filename matching is case-insensitive. If all MAC values are missing or blank, return HTTP 400 with `ANSWER_MAC_REQUIRED`.
 
-On a successful lookup, return the selected TOML template with content type `application/toml`. Replace exactly one `__PROXMOX_ROOT_PASSWORD_HASH__` token in memory with the startup-generated yescrypt hash; do not modify the source file. Other template content remains unchanged. JSON answer bodies are not generated; the installer advertises JSON in `Accept` but documents that a TOML response continues to work.
+On a successful lookup, return the selected TOML template with content type `application/toml`. Replace at most one `__PROXMOX_ROOT_PASSWORD_HASH__` token when it appears as the `root-password-hashed` value. Do not modify source files. Templates may instead already contain `root-password` or `root-password-hashed` without a placeholder. JSON answer bodies are not generated.
 
-Invalid JSON returns HTTP 400 with error code `INVALID_JSON`. A malformed nonblank MAC returns HTTP 400 with error code `ANSWER_MAC_INVALID`; a request with no nonblank MAC returns HTTP 400 with error code `ANSWER_MAC_REQUIRED`. These responses use the shared JSON error envelope containing `timestamp`, `status`, `error`, `errorCode`, `message`, `path`, `trace`, and `fields`. A missing answer file for every valid MAC returns HTTP 404 with error code `ANSWER_NOT_FOUND`. An unreadable answer file or invalid TOML returns HTTP 500 with the existing respective error code and does not continue to a later MAC. The endpoint does not expose CRUD operations or authentication endpoints.
+Map API errors as follows:
+
+| HTTP status | Error code | Condition |
+|---|---|---|
+| 400 | `INVALID_JSON` | The request body is malformed JSON. |
+| 400 | `VALIDATION_ERROR` | Bean Validation rejects the request. |
+| 400 | `ANSWER_MAC_REQUIRED` | No nonblank MAC address is supplied. |
+| 400 | `ANSWER_MAC_INVALID` | A nonblank MAC address has invalid syntax. |
+| 413 | `REQUEST_BODY_TOO_LARGE` | The request body exceeds 1 MiB. |
+| 404 | `ANSWER_NOT_FOUND` | No answer file exists for any usable requested MAC. |
+| 404 | `RESOURCE_NOT_FOUND` | The requested URL does not map to a resource. |
+| 405 | `METHOD_NOT_ALLOWED` | Unsupported HTTP method. |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | Unsupported `Content-Type`. |
+| 500 | `ANSWER_UNREADABLE` | The answers directory or selected answer file cannot be read. |
+| 500 | `ANSWER_INVALID_TOML` | The selected answer file contains invalid TOML. |
+| 500 | `ANSWER_TEMPLATE_INVALID` | The selected answer template fails password rendering policy. |
+| 500 | `INTERNAL_ERROR` | An unexpected application failure occurs. |
+
+A missing answers directory is `ANSWER_UNREADABLE`, not `ANSWER_NOT_FOUND`. An unreadable file, invalid TOML, or invalid template stops lookup; the service does not continue to a later MAC. The endpoint does not expose CRUD operations or authentication endpoints.
 
 ## Consequences
 
-Multi-interface nodes are identified even when the management NIC is not `network_interfaces[0]`. Blank and missing MAC values retain their existing skip behavior; malformed nonblank values are rejected before lookup. Existing API statuses and error codes remain unchanged for existing cases. The new malformed-MAC case has its own stable error code. The service preserves the operator-managed TOML except for the in-memory password substitution. The shared error envelope gives malformed input and server failures a localized, machine-readable shape while keeping the success response as TOML.
+Multi-interface nodes are identified even when the management NIC is not `network_interfaces[0]`. Operators can use wiki-style uppercase filenames without a silent 404. Template policy failures are distinguishable from TOML syntax errors. The shared error envelope gives malformed input and server failures a localized, machine-readable shape while keeping the success response as TOML.
 
 ## Alternatives Considered
 
@@ -36,3 +54,4 @@ Multi-interface nodes are identified even when the management NIC is not `networ
 - Rewriting, normalizing, or augmenting TOML beyond the in-memory root-password placeholder substitution.
 - Application-level authentication (`Authorization: Bearer` is optional in the ISO, not in this service).
 - Serving JSON answer documents.
+- Post-installation webhook receivers.
