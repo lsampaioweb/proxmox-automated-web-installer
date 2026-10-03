@@ -30,6 +30,6 @@ The service is intentionally narrow and mostly stateless. Answer-file changes ar
 
 ## Alternatives Considered
 
-1. **Terraform/Ansible provisioning** — Rejected: requires agent on target; this service needs zero prior setup on target machines.
-2. **Static HTTP file server (nginx)** — Rejected: would require manual URL mapping per MAC address; no intelligence; this service adds dynamic lookup.
-3. **Database-backed answer file repository** — Rejected: adds complexity (schema, migration, backup); filesystem is sufficient for personal homelab.
+1. **Terraform/Ansible provisioning:** Rejected because it requires an agent on each target. This service needs no setup on the target machines.
+2. **Static HTTP file server (nginx):** Rejected because every MAC would need a manual URL mapping. This service looks up the matching file itself.
+3. **Database-backed answer file repository:** Rejected because a database would add schema, migration, and backup work. The filesystem is enough for this homelab.

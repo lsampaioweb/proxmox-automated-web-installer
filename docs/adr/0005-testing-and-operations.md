@@ -7,7 +7,7 @@
 
 ## Context
 
-The service has a small public surface but its behavior depends on request shape, MAC syntax and normalization, multi-interface lookup, filesystem state, symlink-safe resolution, in-memory password substitution, and safe audit metadata. Proxmox also documents compatibility requirements and provides a validate-answer tool for operational validation.
+The service exposes one endpoint, but its behavior depends on request shape, MAC validation, lookup order, filesystem state, symlink handling, password rendering, and audit logging. Proxmox also publishes compatibility guidance and provides `validate-answer` for checking rendered files.
 
 ## Decision
 
@@ -32,15 +32,15 @@ Tests must cover the controller and repository, including:
 - symlinked answer entries and symlink-based attempts to resolve outside the canonical answers directory being rejected as unreadable; and
 - audit metadata, control-character sanitization in request-derived log fields, and the absence of request-body or TOML-content logging, as appropriate.
 
-Tests for error responses must verify status and error codes, and localized messages for both English and `pt-BR`. New message keys must be present in both bundles with matching key sets and placeholder arity.
+Error-response tests must check status, error code, and localized messages in English and `pt-BR`. Keep both bundles' key sets and placeholder counts in sync.
 
-Render every committed answer template in automated tests. When `proxmox-auto-install-assistant` is on `PATH` and new enough for the template schema, run `validate-answer` against each rendered file; if the installed assistant rejects newer fields such as interface-name pinning, skip that external check rather than failing the suite.
+Render every committed template in the test suite. If `proxmox-auto-install-assistant` is installed and supports the template schema, run `validate-answer` on each rendered file. If the installed tool rejects a newer field such as interface-name pinning, skip only the external validation. Keep the rendering checks running.
 
 Operational setup must provide the externally configured answer-file directory, seed templates from `host_vars` `mac_bind`, set `PROXMOX_ROOT_PASSWORD` through a protected runtime environment, ensure Linux `libcrypt` supports yescrypt, place a TLS-terminating reverse proxy in front of production, and keep request bodies within the application's 1 MiB limit. Restart the service to change the password.
 
 ## Consequences
 
-The test suite protects the narrow API contract, MAC validation, filesystem containment, template rendering policy, and localization. Proxmox-specific answer validity remains validated with the vendor tool against rendered responses when a new enough assistant is available. Operational answer-template changes take effect without rebuilding or restarting; password changes require an application restart.
+The test suite checks the API contract, MAC validation, filesystem boundaries, template rendering, and localization. When a compatible assistant is available, the vendor tool also checks rendered answers. Template edits take effect without a rebuild or restart. Password changes require an application restart.
 
 ## Alternatives Considered
 

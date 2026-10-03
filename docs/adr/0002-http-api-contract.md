@@ -7,15 +7,15 @@
 
 ## Context
 
-Proxmox Automated Installation calls an HTTP source with `POST` JSON that includes `network_interfaces`. Each interface includes a MAC address and link name. A server can have multiple network interfaces. The Proxmox wiki documents that the installer accepts a TOML or JSON answer body and that a TOML-only server remains compatible.
+Proxmox Automated Installation sends a `POST` request with JSON that includes `network_interfaces`. Each entry has a MAC address and link name, and a host can have several interfaces. Proxmox allows an HTTP source to return TOML or JSON, so this service can return TOML only.
 
 ## Decision
 
-Expose exactly one public endpoint: `POST /answer`.
+Expose one public endpoint: `POST /answer`.
 
-The request follows the Proxmox Automated Installation HTTP source protocol. Unknown keys, including `enable_btrfs`, are ignored so a newer installer document still resolves an answer file. Lookup walks `network_interfaces` in request order. A null, missing, or blank `mac` value is skipped. Trim each nonblank value, then require exactly six two-digit ASCII hexadecimal octets separated by five colons (`XX:XX:XX:XX:XX:XX`). If any nonblank MAC is malformed, reject the entire request before filesystem lookup with HTTP 400 and error code `ANSWER_MAC_INVALID`. Otherwise, normalize each MAC to lowercase and use the first MAC whose answer file exists. Filename matching is case-insensitive. If all MAC values are missing or blank, return HTTP 400 with `ANSWER_MAC_REQUIRED`.
+Follow the Proxmox HTTP source protocol. Ignore unknown keys, including `enable_btrfs`, so newer installer documents still work. Check `network_interfaces` in request order. Skip a missing or blank `mac`; trim each nonblank value and require six two-digit ASCII hexadecimal octets separated by colons (`XX:XX:XX:XX:XX:XX`). If any nonblank MAC is malformed, reject the whole request before looking at the filesystem. Return HTTP 400 with `ANSWER_MAC_INVALID`. Otherwise, lowercase each valid MAC and use the first one with a matching answer file. Filename matching ignores letter case. If every MAC is missing or blank, return HTTP 400 with `ANSWER_MAC_REQUIRED`.
 
-On a successful lookup, return the selected TOML template with content type `application/toml`. Replace at most one `__PROXMOX_ROOT_PASSWORD_HASH__` token when it appears as the `root-password-hashed` value. Do not modify source files. Templates may instead already contain `root-password` or `root-password-hashed` without a placeholder. JSON answer bodies are not generated.
+On a match, return the selected TOML template with content type `application/toml`. Replace at most one `__PROXMOX_ROOT_PASSWORD_HASH__` token, and only when it is the value of `root-password-hashed`. Never modify the source file. A template may instead contain a finished `root-password` or `root-password-hashed` value and no placeholder. The service does not generate JSON answers.
 
 Map API errors as follows:
 
@@ -35,7 +35,7 @@ Map API errors as follows:
 | 500 | `ANSWER_TEMPLATE_INVALID` | The selected answer template fails password rendering policy. |
 | 500 | `INTERNAL_ERROR` | An unexpected application failure occurs. |
 
-A missing answers directory is `ANSWER_UNREADABLE`, not `ANSWER_NOT_FOUND`. An unreadable file, invalid TOML, or invalid template stops lookup; the service does not continue to a later MAC. The endpoint does not expose CRUD operations or authentication endpoints.
+If the answers directory is missing, return `ANSWER_UNREADABLE`, not `ANSWER_NOT_FOUND`. Stop lookup when the selected file is unreadable or contains invalid TOML or an invalid template; do not try a later MAC. The endpoint has no CRUD or authentication routes.
 
 ## Consequences
 

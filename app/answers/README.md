@@ -10,12 +10,12 @@ Each file is a Proxmox answer template:
 
 - `root-password-hashed` uses `__PROXMOX_ROOT_PASSWORD_HASH__`, replaced in memory
 - `[network.interface-name-pinning]` maps every `mac_bind` NIC from Ansible (PVE 9.1+)
-- `disk-list = ["sda"]` is a placeholder — replace before a real install
+- `disk-list = ["sda"]` is only a placeholder. Replace it before installing.
 
 Source files are never modified. Secrets are never logged.
 
-Bond/VLAN layout stays with Ansible after install; the installer configures the
-initial network interface and pinned names.
+Ansible configures bonds and VLANs after installation. During setup, Proxmox
+configures the initial network interface and pins its name.
 
 ## Configure the root password
 
@@ -67,25 +67,12 @@ Only use `disk-list` when the device name is known and stable.
 
 ## Validate rendered answer files
 
-Committed templates contain the password placeholder and are not ready to install.
-Validate the rendered answer returned by the service, not the template on disk.
-
-From `app/`, with the service running and the appropriate host MAC:
-
-```bash
-curl -fsS -H 'Content-Type: application/json' \
-	-d '{"network_interfaces":[{"mac":"b4:2e:99:ad:b0:c0"}]}' \
-	http://localhost:8080/answer > /tmp/proxmox-answer.toml
-proxmox-auto-install-assistant validate-answer /tmp/proxmox-answer.toml
-rm /tmp/proxmox-answer.toml
-```
-
-Repeat for each host file. Protect and remove the temporary rendered answer
-because it contains the real password hash.
-
-`mvn test` also renders every committed template. When
-`proxmox-auto-install-assistant` is on `PATH`, that test runs `validate-answer`
-against each rendered file when the installed tool is new enough for the schema.
+Committed templates are not complete install answers. Use the
+[automated-installation guide](../../docs/operations/automated-installation.md#validate-a-rendered-answer)
+to fetch and validate a rendered answer. It contains the generated password
+hash; protect and remove the temporary file after validation. `mvn test` also
+renders every committed template and runs the vendor validator when the
+installed version supports the template schema.
 
 ## Home
 

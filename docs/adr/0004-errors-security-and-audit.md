@@ -7,27 +7,27 @@
 
 ## Context
 
-The endpoint receives installer metadata and returns sensitive installation configuration. Operators need enough structured evidence to diagnose requests without logging request bodies or answer-file contents. Clients need stable error codes and localized messages without receiving internal exception details.
+The endpoint receives installer metadata and returns sensitive installation settings. Operators need enough structured data to investigate requests, but logs must not include request bodies or answer files. Clients need stable error codes and localized messages without internal exception details.
 
 ## Decision
 
-Return a shared JSON error envelope containing `timestamp`, `status`, `error`, `errorCode`, `message`, `path`, `trace`, and `fields`. The `message` and field-validation details are localized; `errorCode` remains stable and machine-readable.
+Return every API error in the same JSON envelope: `timestamp`, `status`, `error`, `errorCode`, `message`, `path`, `trace`, and `fields`. Localize the message and field errors. Keep `errorCode` stable for client code.
 
-Map API errors according to ADR-0002, including oversized request bodies (`413`) and method/media-type failures (`405` / `415`) ahead of the catch-all handler so framework client errors do not collapse into `INTERNAL_ERROR`.
+Use the error mapping in ADR-0002. Handle oversized bodies (`413`), unsupported methods (`405`), and unsupported media types (`415`) before the catch-all handler so they keep their correct status and code.
 
-Record an INFO audit event for every answer request that reaches the service, including malformed-MAC requests and failures. Include timestamp, client address, MAC metadata, selected or last-considered MAC, filename, outcome, error code, and latency. In production behind a reverse proxy, enable `server.forward-headers-strategy=framework` so the audited client address is the installer rather than the proxy. Sanitize request-derived log fields by replacing control characters and Unicode line and paragraph separators with `_`.
+Write an INFO audit event for every answer request handled by the service, including malformed-MAC requests and failures. Record the timestamp, client address, MAC metadata, selected or last-checked MAC, filename, outcome, error code, and latency. In production, set `server.forward-headers-strategy=framework` behind the reverse proxy so the client address identifies the installer, not the proxy. Replace control characters and Unicode line or paragraph separators in request-derived log fields with `_`.
 
-Requests rejected before the service, including invalid JSON, Bean Validation failures, oversized bodies, unsupported methods, and unsupported media types, write the same `Answer request` prefix with the corresponding error code. DEBUG logs may record each MAC lookup attempt as `HIT` or `MISS`. Never log raw request JSON, answer TOML contents, the plaintext root password, or the generated password hash.
+Requests rejected before the service (invalid JSON, validation failures, oversized bodies, unsupported methods, or unsupported media types) use the same localized audit message and include the matching error code. DEBUG logs may record each MAC lookup as `HIT` or `MISS`. Never log request JSON, answer-file contents, the plaintext root password, or its generated hash.
 
 The root password is supplied through protected runtime configuration and hashed once at startup using yescrypt. `crypt(3)` is not thread-safe and must remain on the startup path only.
 
 TLS terminates at an internal reverse proxy by default. The application rejects request bodies larger than 1 MiB before message conversion; the reverse proxy should enforce the same or a stricter limit. Application-level authentication remains disabled because this is an internal homelab service; network placement and transport protection are the operational controls.
 
-Actuator endpoints remain unauthenticated in this internal deployment. Expose only `health`, `info`, and `metrics`; rely on network placement as the access boundary and do not expose the service directly to the public internet.
+Actuator endpoints are also unauthenticated. Expose only `health`, `info`, and `metrics`, and keep them behind the internal network boundary. Do not expose the service directly to the public internet.
 
 ## Consequences
 
-Stable error codes let clients distinguish malformed requests, missing answers, template policy failures, and server failures. Audit records let operators correlate outcomes with a node and selected file while keeping installation documents and secrets out of logs. The deployment remains dependent on its internal network boundary because the endpoint and Actuator endpoints have no application authentication.
+Stable error codes distinguish malformed requests, missing answers, template-policy failures, and server errors. Audit records help operators match a request to a node and answer file without putting installation details or secrets in logs. Because neither the API nor Actuator requires authentication, the deployment depends on its internal network boundary.
 
 ## Alternatives Considered
 

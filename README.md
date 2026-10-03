@@ -1,353 +1,91 @@
 # Proxmox Web Installer
 
-Lightweight Spring Boot service that returns Proxmox automated-installation TOML answer files from a MAC address lookup.
+Spring Boot service that returns Proxmox automated-installation TOML answer files selected by installer-reported MAC address.
 
 ## Purpose
 
-Serve the operator-managed answer file for a MAC address reported by the Proxmox installer.
+Serve the operator-managed answer file selected from a Proxmox installer request.
 
 ## Overview
 
-- Exposes a single endpoint: `POST /answer`
-- Identifies the node by trying each `network_interfaces[].mac` until a file matches (case-insensitive filename)
-- Reads `<mac>.toml` from a configurable filesystem directory on every request
-- Returns the selected TOML with only its root-password placeholder replaced in memory, using `Content-Type: application/toml`
-- Returns a JSON error envelope with localized messages and stable error codes for invalid input, missing files, and unreadable or invalid TOML/templates
-- Records audit metadata without logging request bodies or answer-file contents
+- Exposes `POST /answer` for the Proxmox HTTP answer source.
+- Tries installer-reported MAC addresses in request order and matches filenames case-insensitively.
+- Reads operator-managed TOML templates from a configurable directory.
+- Renders the root-password hash in memory and returns TOML.
+- Localizes API errors and request logs; audit records omit request bodies and answer contents.
 
 ## Prerequisites
 
-- Java 25
-- Maven 3.9+
-- A Linux runtime with `libcrypt` supporting yescrypt
-- JVM native access enabled for JNA (`--enable-native-access=ALL-UNNAMED`)
-- A directory of answer files named `{mac-address}.toml`. Seeded files for the Proxmox hosts are in [`app/answers/`](app/answers/README.md).
-- Optional: `proxmox-auto-install-assistant` (PVE 9.1+ recommended for interface-name pinning) and `xorriso` to validate answer files and prepare an automated-install ISO
+- Java 25 and Maven 3.9+.
+- Linux `libcrypt` with yescrypt support.
+- Optional for answer validation and ISO preparation: `proxmox-auto-install-assistant` and `xorriso`.
+- Maven configures JNA native access for `spring-boot:run`. Packaged JAR launches need `--enable-native-access=ALL-UNNAMED`.
 
 ## Configuration
 
-Run commands from `app/`. Relative paths below are relative to that directory.
+Run Maven commands from `app/`. Paths in application configuration are relative to that directory.
 
 | Setting | Purpose | Example |
 |---|---|---|
-| `proxmox.answers.directory` | Filesystem directory that contains answer files | `./answers` |
+| `proxmox.answers.directory` / `PROXMOX_ANSWERS_DIRECTORY` | Directory containing answer templates | `./answers` |
 | `SPRING_PROFILES_ACTIVE` | Runtime profile override | `development` |
-| `PROXMOX_ANSWERS_DIRECTORY` | Environment override for the answers directory | `/var/lib/proxmox-web-installer/answers` |
-| `PROXMOX_ROOT_PASSWORD` | Plaintext root password; required at startup and hashed with yescrypt in memory | Set through a protected runtime secret |
+| `PROXMOX_ROOT_PASSWORD` | Required startup secret, hashed with yescrypt in memory | Protected runtime secret |
 
-Do not commit secrets or pass the password as a command-line argument. The
-application creates one salted yescrypt hash at startup, substitutes it into
-answer responses in memory, and never writes the hash back to the answer files.
-All hosts that use the password placeholder share this root password. Restart the
-service to apply a password change.
+Do not commit secrets or pass the password as a command-line argument. Templates
+using the password placeholder share one salted yescrypt hash generated at
+startup. Restart the service to apply password changes.
 
-TLS should terminate at an internal reverse proxy in production. The application
-listens on port `8080` for proxy upstream traffic, and the proxy should expose
-the HTTPS endpoint on port `443` with `forward-headers-strategy=framework`.
-Configure `server.ssl.*` only if the JVM itself must terminate TLS. This
-application does not enable authentication. Do not expose the service directly
-to the public internet.
-
-The application rejects request bodies larger than 1 MiB with HTTP `413`. Apply
-the same or a stricter request-body limit at the reverse proxy.
-
-## Prepare answer files before a real install
-
-Seeded files in [`app/answers/`](app/answers/README.md) are templates:
-
-- `root-password-hashed` contains `__PROXMOX_ROOT_PASSWORD_HASH__`, replaced only in the response
-- `[network.interface-name-pinning]` is seeded from Ansible `mac_bind` (needs PVE 9.1+)
-- `disk-list = ["sda"]` is a placeholder — prefer `filter.ID_SERIAL` / `ID_WWN` before install
-
-Set `PROXMOX_ROOT_PASSWORD` through the service's protected environment before
-starting it. Full setup and host mapping: [`app/answers/README.md`](app/answers/README.md).
-For a packaged JAR launched outside Maven, include
-`--enable-native-access=ALL-UNNAMED` in the JVM options for JNA/libcrypt access.
-
-Find the OS disk on the target host (or from similar hardware):
-
-```bash
-lsblk -d -o NAME,SIZE,MODEL,SERIAL
-```
-
-Prefer a stable disk filter:
-
-```toml
-[disk-setup]
-filesystem = "ext4"
-filter.ID_SERIAL = "YOUR_DISK_SERIAL*"
-```
-
-Validate the rendered response from `app/` while the service is running with
-`PROXMOX_ROOT_PASSWORD` configured:
-
-```bash
-curl -fsS -H 'Content-Type: application/json' \
-  -d '{"network_interfaces":[{"mac":"b4:2e:99:ad:b0:c0"}]}' \
-  http://localhost:8080/answer > /tmp/proxmox-answer.toml
-proxmox-auto-install-assistant validate-answer /tmp/proxmox-answer.toml
-rm -f /tmp/proxmox-answer.toml
-```
-
-The response contains the generated root-password hash; protect and remove the
-temporary file after validation. Committed templates are not valid install
-answers until the service renders the password placeholder.
+In production, the app listens on plain HTTP at port `8080` behind a trusted
+reverse proxy. The proxy should terminate TLS, typically on port `443`, and
+forward the original client headers. The app rejects request bodies over 1 MiB;
+set the proxy limit to the same size or lower. The service has no authentication,
+so keep it and its Actuator endpoints off the public internet.
 
 ## Run
 
-All Maven commands are run from `app/`.
-
-For a local interactive run, enter the password without echoing it before starting
-the service:
-
-```bash
-read -rsp 'Proxmox root password: ' PROXMOX_ROOT_PASSWORD
-printf '\n'
-export PROXMOX_ROOT_PASSWORD
-```
-
-Development (console + file logs, port `8080`):
+From the repository root, set the required password without echoing it and start
+the development profile:
 
 ```bash
 cd app
+read -rsp 'Proxmox root password: ' PROXMOX_ROOT_PASSWORD
+printf '\n'
+export PROXMOX_ROOT_PASSWORD
 SPRING_PROFILES_ACTIVE=development mvn spring-boot:run
 ```
 
-Production (explicit `production` profile, file logs only, port `8080` behind a TLS proxy):
+In another terminal, check the answer endpoint without printing the rendered
+password hash:
+
+```bash
+curl -fsS -o /dev/null -w 'HTTP %{http_code} %{content_type}\n' \
+  -H 'Content-Type: application/json' \
+  -d '{"network_interfaces":[{"mac":"b4:2e:99:ad:b0:c0"}]}' \
+  http://localhost:8080/answer
+```
+
+For production, run the `production` profile behind the configured TLS reverse
+proxy:
 
 ```bash
 cd app
 SPRING_PROFILES_ACTIVE=production mvn spring-boot:run
 ```
 
-Use `development` for the curl checks below so audit lines appear on the console.
-
 ## Access
 
-- Answer endpoint: `POST http://localhost:8080/answer` (`development`)
-- Answer endpoint: `POST http://localhost:8080/answer` (`production` proxy upstream)
-- Production client URL: `POST https://your-proxy-host/answer` (TLS reverse proxy)
-- Health endpoint: `GET http://localhost:8080/actuator/health` (`development`)
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs` (`development`)
-- Swagger UI: `http://localhost:8080/swagger-ui.html` (`development`)
-
-The answer endpoint is intentionally anonymous because this service is restricted
-to the internal homelab network. Do not expose it directly to the public internet.
-Actuator health is available for probes; non-health actuator endpoints are not
-intended as public application APIs.
-
-Logs:
-
-- `development`: console and `app/logs/proxmox-web-installer.log`
-- `production`: `app/logs/proxmox-web-installer.log` only
-
-A successful lookup writes an INFO audit line like:
-
-```text
-Answer request timestamp=2026-09-20T21:00:00Z client=127.0.0.1 product=pve productName=Proxmox VE iso=9.0 isoRelease=1 schema=1.0 systemSerial=900030XXXX systemUuid=6fb36fd4-77a1-57e6-13ae-XXXXXXcb48d7 systemName=RS700 baseboardSerial=23041870000XXXX chassisSerial=I02308XXXX macs=b4:2e:99:ad:b0:c0 mac=b4:2e:99:ad:b0:c0 file=b4:2e:99:ad:b0:c0.toml outcome=SUCCESS errorCode= latencyMs=4
-```
-
-Every request that reaches the service writes this INFO line, including errors. `outcome` is one of `SUCCESS`, `BAD_REQUEST`, `NOT_FOUND`, `UNREADABLE`, `INVALID_TOML`, `INVALID_TEMPLATE`, or `INTERNAL_ERROR`. Count them with `grep -c "outcome=SUCCESS"` (and the other outcomes) in the log file.
-
-Request-derived audit fields replace control characters and Unicode line and
-paragraph separators with `_` so a client cannot forge additional log lines.
-
-Invalid JSON, Bean Validation, oversized bodies, unsupported methods, and
-unsupported media types never reach the service. Those still start with
-`Answer request`, use `outcome=BAD_REQUEST`, and include the matching error code
-such as `REQUEST_BODY_TOO_LARGE`, `METHOD_NOT_ALLOWED`, or `UNSUPPORTED_MEDIA_TYPE`.
-
-With the `debug` profile, each MAC lookup also logs `Answer MAC attempt mac=... result=HIT` or `result=MISS`.
-
-The line must not contain the raw request JSON or the TOML body.
-
-### Curl checks (`development`)
-
-From another terminal, with the app already running.
-
-HTTP 200 and TOML body (`pve-01.lan.homelab`):
-
-```bash
-curl -sS -D - -o /tmp/pve-answer.toml \
-  -H "Content-Type: application/json" \
-  -d '{"network_interfaces":[{"mac":"B4:2E:99:AD:B0:C0","link":"enp1board0"}]}' \
-  http://localhost:8080/answer
-```
-
-Expect `HTTP/1.1 200`, `Content-Type: application/toml`, and a TOML file in `/tmp/pve-answer.toml`. Console audit: `mac=b4:2e:99:ad:b0:c0 file=b4:2e:99:ad:b0:c0.toml outcome=SUCCESS`.
-
-HTTP 200 using a later NIC when the first MAC has no file:
-
-```bash
-curl -sS -D - -o /tmp/pve-answer-second.toml \
-  -H "Content-Type: application/json" \
-  -d '{"network_interfaces":[{"mac":"00:11:22:33:44:55","link":"nic0"},{"mac":"18:c0:4d:f1:fe:c9","link":"enp1board0"}]}' \
-  http://localhost:8080/answer
-```
-
-Expect `200` and audit `mac=18:c0:4d:f1:fe:c9 file=18:c0:4d:f1:fe:c9.toml outcome=SUCCESS`.
-
-HTTP 400 invalid JSON:
-
-```bash
-curl -sS -D - \
-  -H "Content-Type: application/json" \
-  -d "{ not-json" \
-  http://localhost:8080/answer
-```
-
-Expect `400` and `Content-Type: application/json` with `"errorCode":"INVALID_JSON"`.
-
-HTTP 400 no usable MAC:
-
-```bash
-curl -sS -D - \
-  -H "Content-Type: application/json" \
-  -d '{"network_interfaces":[{"mac":"  "}]}' \
-  http://localhost:8080/answer
-```
-
-Expect `400` and `"errorCode":"ANSWER_MAC_REQUIRED"`. Console audit: `outcome=BAD_REQUEST`.
-
-HTTP 400 malformed MAC:
-
-```bash
-curl -sS -D - \
-  -H "Content-Type: application/json" \
-  -d '{"network_interfaces":[{"mac":"b4:2e:99"}]}' \
-  http://localhost:8080/answer
-```
-
-Expect `400` and `"errorCode":"ANSWER_MAC_INVALID"`. The service rejects the request before filesystem lookup.
-
-HTTP 404 unknown MAC:
-
-```bash
-curl -sS -D - \
-  -H "Content-Type: application/json" \
-  -d '{"network_interfaces":[{"mac":"aa:bb:cc:dd:ee:ff"}]}' \
-  http://localhost:8080/answer
-```
-
-Expect `404` and `"errorCode":"ANSWER_NOT_FOUND"`. Console audit: `outcome=NOT_FOUND`.
-
-HTTP 405 unsupported method:
-
-```bash
-curl -sS -D - http://localhost:8080/answer
-```
-
-Expect `405` and `"errorCode":"METHOD_NOT_ALLOWED"`.
-
-Follow the log file with:
-
-```bash
-tail -f logs/proxmox-web-installer.log
-```
-
-## ISO preparation
-
-The Proxmox installer calls this service when the prepared boot media contains the answer URL. Preparing an ISO embeds that URL and enables the **Automated Installation** boot entry.
-
-Official reference: [Proxmox Automated Installation](https://pve.proxmox.com/wiki/Automated_Installation).
-
-### Prerequisites for ISO prep
-
-1. `PROXMOX_ROOT_PASSWORD` is configured through the service's protected runtime environment and each host's disk selection is correct.
-2. This service is reachable from the install network at a stable URL ending in `/answer`.
-3. Prefer HTTPS via reverse proxy. If the certificate is self-signed or the URL uses an IP, pin the SHA256 fingerprint (below).
-4. On the machine that builds the ISO:
-
-```bash
-sudo apt update
-sudo apt install proxmox-auto-install-assistant xorriso
-```
-
-5. Download a current Proxmox VE ISO from [proxmox.com](https://www.proxmox.com/en/downloads) to a local path, for example `/path/to/proxmox-ve.iso`. Use PVE 9.1+ if answer files include interface-name pinning.
-
-### Bake the answer URL into the ISO
-
-Replace the URL with your real answer-server address. The application listens on port `8080`; production clients reach it through the TLS-terminating reverse proxy, typically on port `443`.
-
-HTTP on a trusted lab segment (not recommended for anything beyond temporary tests):
-
-```bash
-proxmox-auto-install-assistant prepare-iso \
-  proxmox-ve_9.2-1.iso \
-  --fetch-from http \
-  --url "http://proxmox-auto-install-assistant.lan.home:8080/answer" \
-  --output proxmox-ve-auto.iso
-```
-
-HTTPS with certificate fingerprint (recommended when using an IP or a self-signed / private CA cert):
-
-```bash
-# Fingerprint of the certificate that terminates TLS (proxy or app)
-openssl x509 -in /path/to/server.crt -noout -fingerprint -sha256
-```
-
-```bash
-proxmox-auto-install-assistant prepare-iso \
-  proxmox-ve_9.2-1.iso \
-  --fetch-from http \
-  --url "https://proxmox-auto-install-assistant.lan.home/answer" \
-  --cert-fingerprint "AA:BB:CC:DD:..." \
-  --output proxmox-ve-auto.iso
-```
-
-This application does not require an authorization token. Do not pass `--answer-auth-token` unless you later add bearer authentication to the service. If set, the token is stored in plaintext inside the ISO.
-
-### Inspect the prepared ISO
-
-```bash
-xorriso -indev proxmox-ve-auto.iso -find / -name auto-installer-mode.toml
-cat auto-installer-mode.toml
-```
-
-The first command confirms that `/auto-installer-mode.toml` is present in the
-prepared ISO. The second shows the preparation settings written beside the ISO;
-confirm `mode = "http"` and that the URL ends in `/answer`. This sidecar file is
-not a readback of the ISO's embedded contents.
-
-### Boot from USB
-
-From the directory containing `proxmox-ve-auto.iso`, identify the whole USB disk
-with `lsblk` and unmount all its filesystems before writing. Writing to the disk
-erases its existing contents. `/dev/sdX` is a placeholder; never use a mounted
-path or a partition such as `/dev/sdX1`:
-
-```bash
-lsblk -o PATH,SIZE,MODEL,TRAN,TYPE,MOUNTPOINTS
-sudo dd if=proxmox-ve-auto.iso of=/dev/sdX bs=4M status=progress conv=fsync
-```
-
-If the desktop mounts the USB again after writing, unmount it before checking
-the result. Reconfirm the device name with `lsblk`, then compare the written
-bytes with the ISO:
-
-```bash
-sudo cmp -n "$(stat -c%s proxmox-ve-auto.iso)" proxmox-ve-auto.iso /dev/sdX \
-  && echo "USB matches ISO"
-```
-
-This verifies the image on the USB, including the embedded mode file; it does
-not verify that the installer can reach the answer server from the target host.
-
-Boot the target host from that USB. The **Automated Installation** entry is selected after about 10 seconds. The installer POSTs JSON (including MACs) to your URL; this service returns the matching `{mac}.toml`.
-
-Watch the answer-server audit log during the install (`outcome=SUCCESS` and the expected MAC/filename). On the installer, failures often leave clues in `/tmp/fetch_answer.log` and `/tmp/auto_installer`.
-
-The installer fetches the answer over HTTP(S) from this service.
-
-### Checklist before first automated install
-
-- [ ] `PROXMOX_ROOT_PASSWORD` is configured through the service's protected runtime environment
-- [ ] Every host `{mac}.toml` has a safe disk selector (prefer filters) and password placeholder
-- [ ] A rendered answer from `/answer` passes `proxmox-auto-install-assistant validate-answer`
-- [ ] Answer service is up and reachable from the install NIC network
-- [ ] Curl against `/answer` with a real host MAC returns `200` and TOML
-- [ ] Prepared ISO points at that same `/answer` URL
-- [ ] Audit log shows `SUCCESS` when you curl; installer will use the same path
+- Answer endpoint: `POST http://localhost:8080/answer` (application upstream)
+- Production client URL: `https://your-proxy-host/answer`
+- Health endpoint: `GET http://localhost:8080/actuator/health`
+- OpenAPI JSON and Swagger UI are enabled only in `development` at `/v3/api-docs` and `/swagger-ui.html`.
+
+The health endpoint is available for probes. Non-health Actuator endpoints are
+not intended as public APIs.
+
+Request logs use the request's locale; logs without a request use the configured
+default locale. Audit fields include `mac`, `file`, `outcome`, `errorCode`, and
+`latencyMs`; request JSON, answer contents, and password material are never
+logged.
 
 ## Tests
 
@@ -357,7 +95,9 @@ From `app/`:
 mvn test
 ```
 
-Automated tests use a temporary answers directory and do not require a live Proxmox installer. They also render every committed template. When `proxmox-auto-install-assistant` is on `PATH` and new enough for the template schema, `validate-answer` runs against each rendered file.
+The suite renders every committed answer template. If
+`proxmox-auto-install-assistant` is installed and supports the template schema,
+the suite also validates the rendered files with `validate-answer`.
 
 ## API summary
 
@@ -365,5 +105,10 @@ Automated tests use a temporary answers directory and do not require a live Prox
 |---|---|---|---|
 | `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON / validation / MAC errors; `413` body over 1 MiB; `404` no matching file; `405` wrong method; `415` wrong Content-Type; `500` unreadable file, invalid TOML, invalid template, or internal error |
 
-Error responses use `application/json` with the documented error envelope and
-stable `errorCode` values.
+Errors use `application/json` with a localized message and stable `errorCode`.
+
+## Further reading
+
+- [Answer templates, password policy, and disk selection](app/answers/README.md)
+- [API and filesystem decisions](docs/adr/README.md)
+- [Rendered answers, API checks, ISO preparation, and USB installation](docs/operations/automated-installation.md)

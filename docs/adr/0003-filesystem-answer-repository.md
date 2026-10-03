@@ -11,16 +11,16 @@ Known node answer files are prepared outside the application. Their names are MA
 
 ## Decision
 
-Use an externally configurable filesystem directory as the answer-file store. The repository resolves a normalized, syntactically valid MAC address to a filename matching `<mac-address>.toml` case-insensitively; `.toml` is the one canonical answer-file suffix and must be represented by one shared application constant. Prefer lowercase filenames operationally. The repository does not use a database or an in-memory startup cache.
+Store answer files in a configurable directory. For a normalized, valid MAC, the repository looks for `<mac-address>.toml`, ignoring letter case. Keep `.toml` as the single suffix in a shared application constant. Lowercase filenames are preferred. The repository uses neither a database nor a startup cache.
 
-The repository reads the selected template on every request. Before returning it, the repository:
+Read the selected template on every request. Before returning it:
 
 - replaces at most one `__PROXMOX_ROOT_PASSWORD_HASH__` token when it is exactly the `root-password-hashed` assignment value;
 - validates that the rendered document is TOML and sets exactly one of `root-password` or `root-password-hashed`.
 
 The source file is never modified. A missing answers directory is an unreadable configuration failure. A missing file for the requested MAC remains not-found. Ambiguous case-insensitive filename matches fail closed as unreadable.
 
-Treat the configured answers directory's canonical real directory as the filesystem boundary. Open the answer relative to an anchored directory handle without following symlinks, and verify that the opened object is a regular file. If the filesystem provider cannot provide directory-relative no-follow semantics, fail closed as an unreadable answer rather than falling back to an unsafe lookup.
+Use the answers directory's canonical real path as the filesystem boundary. Open files relative to that directory handle without following symlinks, then verify that each opened object is a regular file. If the filesystem can't provide directory-relative, no-follow access, return `ANSWER_UNREADABLE`. Do not fall back to an unsafe path lookup.
 
 Committed files are templates. Validate rendered responses with `proxmox-auto-install-assistant validate-answer` (PVE 9.1+ for interface-name pinning). Prefer stable disk filters over `disk-list = ["sda"]` before real installs. Optional `root-ssh-keys` belong in the answer file itself when needed.
 

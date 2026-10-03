@@ -1,4 +1,4 @@
-# Proxmox Web Installer — Architecture Decision Records
+# Proxmox Web Installer Architecture Decision Records
 
 **Project:** Proxmox Web Installer (automated Proxmox installation answer server)
 **Status:** Design complete
@@ -33,7 +33,7 @@ The service is intentionally minimal: mostly stateless, database-free, and focus
 
 ## Key Principles
 
-1. **Simplicity over features:** Single responsibility — serve answer files dynamically
+1. **Simplicity over features:** The service has one job: serve answer files.
 2. **Stateless operation:** No database, no persistent state, no complex dependencies
 3. **Filesystem as source:** Answer-template changes are direct filesystem edits; the root password is injected and hashed at runtime
 4. **Internal only:** Network boundary enforcement; TLS via reverse proxy by default
@@ -57,9 +57,9 @@ Proxmox installs from answer file
 
 ## Related Concepts
 
-- **Proxmox automated installation** — Proxmox supports answer files for unattended deployments
-- **MAC address mapping** — Service tries each installer-reported MAC until a file matches
-- **TOML format** — Proxmox answer files are TOML (not JSON, YAML, etc.)
+- **Proxmox automated installation:** Proxmox supports answer files for unattended deployments.
+- **MAC address mapping:** The service checks each installer-reported MAC until it finds a matching file.
+- **TOML format:** Proxmox answer files use TOML, not JSON or YAML.
 
 ## Deployment Context
 
