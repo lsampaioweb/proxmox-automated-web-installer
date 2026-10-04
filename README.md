@@ -19,6 +19,7 @@ Serve the operator-managed answer file selected from a Proxmox installer request
 - Java 25 and Maven 3.9+.
 - Linux `libcrypt` with yescrypt support.
 - Optional for answer validation and ISO preparation: `proxmox-auto-install-assistant` and `xorriso`.
+- For the tested DHCP-timeout ISO workflow: Ubuntu Bash, `squashfs-tools`, and `sudo`; see the [installation guide](docs/operations/automated-installation.md#longer-dhcp-timeout-tested-workflow).
 - Maven configures JNA native access for `spring-boot:run`. Packaged JAR launches need `--enable-native-access=ALL-UNNAMED`.
 
 ## Configuration
@@ -74,10 +75,11 @@ SPRING_PROFILES_ACTIVE=production mvn spring-boot:run
 
 ## Access
 
-- Answer endpoint: `POST http://localhost:8080/answer` (application upstream)
-- Production client URL: `https://your-proxy-host/answer`
-- Health endpoint: `GET http://localhost:8080/actuator/health`
-- OpenAPI JSON and Swagger UI are enabled only in `development` at `/v3/api-docs` and `/swagger-ui.html`.
+- Answer endpoint: `POST http://localhost:8080/answer` (application upstream).
+- Production client URL: `https://your-proxy-host/answer`.
+- Health endpoint: `GET http://localhost:8080/actuator/health`.
+- OpenAPI JSON (development only): `http://localhost:8080/v3/api-docs`.
+- Swagger UI (development only): `http://localhost:8080/swagger-ui.html`.
 
 The health endpoint is available for probes. Non-health Actuator endpoints are
 not intended as public APIs.
@@ -109,6 +111,6 @@ Errors use `application/json` with a localized message and stable `errorCode`.
 
 ## Further reading
 
+- [Rendered answers, API checks, tested DHCP-timeout ISO preparation, and USB installation](docs/operations/automated-installation.md)
 - [Answer templates, password policy, and disk selection](app/answers/README.md)
 - [API and filesystem decisions](docs/adr/README.md)
-- [Rendered answers, API checks, ISO preparation, and USB installation](docs/operations/automated-installation.md)

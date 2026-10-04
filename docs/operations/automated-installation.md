@@ -9,15 +9,23 @@ disk selectors are documented in the [answer-file guide](../../app/answers/READM
 
 - A Proxmox VE ISO downloaded from [proxmox.com](https://www.proxmox.com/en/downloads).
 - `proxmox-auto-install-assistant` and `xorriso` on the ISO preparation machine.
+- For DHCP-timeout customization: Ubuntu Bash, `squashfs-tools`, working `sudo`,
+and enough free space for the extracted filesystem and intermediate ISOs.
 - PVE 9.1 or newer when answer files use interface-name pinning.
 - A reachable answer service and a configured root password.
 
-On Debian-based systems, install the preparation tools with:
+On Ubuntu, install the image-processing tools with:
 
 ```bash
 sudo apt update
-sudo apt install proxmox-auto-install-assistant xorriso
+sudo apt install xorriso squashfs-tools
 ```
+
+Install `proxmox-auto-install-assistant` separately following the
+[official preparation guidance](https://pve.proxmox.com/wiki/Automated_Installation#Assistant_Tool).
+Do not assume it is available in the default Ubuntu repositories. On a
+Debian-based preparation machine with the appropriate Proxmox repository
+configured, install it with `sudo apt install proxmox-auto-install-assistant`.
 
 ## Validate a rendered answer
 
@@ -88,13 +96,72 @@ The assistant uses `--fetch-from http` for its HTTP answer-source mode. This
 selects the source mode; it can still use TLS when the URL begins with
 `https://`. Prefer HTTPS for production.
 
-For a trusted test network only:
+### Longer DHCP timeout (tested workflow)
+
+The stock PVE 9.2-1 installer uses a 10-second initial DHCP discovery window.
+On the tested four-NIC Mini-PC, answer fetching failed with `Network is
+unreachable` before a lease was acquired. An image with a 120-second window
+completed automated installation without a debug shell or manual network setup.
+This timeout is an acquisition limit, not a mandatory two-minute delay.
+
+Run the [preparation script](../../scripts/prepare-proxmox-auto-iso.sh) from the
+repository root as your normal user. It prompts for `sudo` when needed. Start
+with the original ISO, not the previously prepared image:
+
+```bash
+bash scripts/prepare-proxmox-auto-iso.sh \
+  "$HOME/Downloads/ISO/proxmox-ve_9.2-1.iso" \
+  "$HOME/Downloads/ISO/proxmox-ve-auto-dhcp120.iso"
+```
+
+The default answer URL is
+`http://proxmox-auto-install-assistant.lan.homelab:8080/answer`; use plain HTTP
+only on a trusted test network. The hostname must resolve from the installer
+network using the DNS server supplied by DHCP. A successful lookup on the
+preparation laptop alone does not establish this. For the tested network:
+
+```bash
+nslookup proxmox-auto-install-assistant.lan.homelab 20.1.9.14
+```
+
+The expected address is `192.168.3.3`. Replace the DNS server, hostname, and
+expected address for other environments. To override both the URL and timeout,
+provide the optional third and fourth arguments:
+
+```bash
+bash scripts/prepare-proxmox-auto-iso.sh \
+  "$HOME/Downloads/ISO/proxmox-ve_9.2-1.iso" \
+  "$HOME/Downloads/ISO/proxmox-ve-auto-custom.iso" \
+  'http://your-answer-host:8080/answer' 120
+```
+
+The script preserves the source ISO and refuses an existing output path. Before
+publishing the result, it reads back the embedded installer filesystem and
+answer-source settings, checks the DHCP timeout, and verifies the original boot
+UUID and BIOS/UEFI entries. Temporary build files and the assistant's sidecar
+are cleaned up; there is no persistent sidecar to inspect afterward.
+
+This is custom remastering, not a supported assistant timeout option. The
+filesystem layout and compression settings were verified against PVE 9.2-1;
+revalidate the build and hardware boot when changing ISO releases. Apple HFS+
+support is deliberately disabled to avoid overlapping GPT partitions during
+remastering; BIOS and UEFI boot entries are retained.
+
+The script accepts HTTPS URLs but does not expose certificate fingerprint
+pinning. An HTTPS endpoint must present a certificate trusted by the installer.
+Neither answer-file network settings nor first-boot hooks can configure DHCP
+before the HTTP answer fetch.
+
+### Standard preparation alternatives
+
+These commands do not extend the installer's DHCP timeout. Use them when the
+stock discovery window is sufficient. For a trusted test network only:
 
 ```bash
 proxmox-auto-install-assistant prepare-iso \
   proxmox-ve_9.2-1.iso \
   --fetch-from http \
-  --url 'http://proxmox-auto-install-assistant.lan.home:8080/answer' \
+  --url 'http://proxmox-auto-install-assistant.lan.homelab:8080/answer' \
   --output proxmox-ve-auto.iso
 ```
 
@@ -107,7 +174,7 @@ openssl x509 -in /path/to/server.crt -noout -fingerprint -sha256
 proxmox-auto-install-assistant prepare-iso \
   proxmox-ve_9.2-1.iso \
   --fetch-from http \
-  --url 'https://proxmox-auto-install-assistant.lan.home/answer' \
+  --url 'https://192.168.3.3/answer' \
   --cert-fingerprint 'AA:BB:CC:DD:...' \
   --output proxmox-ve-auto.iso
 ```
@@ -135,16 +202,19 @@ use a mounted path or a partition such as `/dev/sdX1` in place of the whole disk
 
 ```bash
 lsblk -o PATH,SIZE,MODEL,TRAN,TYPE,MOUNTPOINTS
-sudo dd if=proxmox-ve-auto.iso of=/dev/sdX bs=4M status=progress conv=fsync
+installer_iso="$HOME/Downloads/ISO/proxmox-ve-auto-dhcp120.iso"
+sudo dd if="$installer_iso" of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-Replace `/dev/sdX` with the verified whole-device path. If the desktop mounts
-the USB again after writing, unmount it before verification. Compare the written
-bytes with the source ISO:
+Replace `/dev/sdX` with the verified whole-device path; never assume `/dev/sda`
+is the USB drive. If using a standard preparation alternative, set
+`installer_iso` to that output instead. If the desktop mounts the USB again
+after writing, unmount it before verification. In the same terminal, compare
+the written bytes with the selected ISO:
 
 ```bash
 lsblk -o PATH,SIZE,MODEL,TRAN,TYPE,MOUNTPOINTS
-sudo cmp -n "$(stat -c%s proxmox-ve-auto.iso)" proxmox-ve-auto.iso /dev/sdX \
+sudo cmp -n "$(stat -c%s "$installer_iso")" "$installer_iso" /dev/sdX \
   && echo 'USB matches ISO'
 ```
 
@@ -161,4 +231,6 @@ a completed password value.
 - The answer service is reachable from the target's install network.
 - A request using a real host MAC returns `200` and TOML.
 - The prepared ISO uses the same `/answer` URL.
+- A DNS-based answer URL resolves through the installer network's DHCP-provided DNS.
+- The network cable is connected before boot; installation needs no debug-shell changes.
 - The audit log records `outcome=SUCCESS` for the expected MAC and filename.
