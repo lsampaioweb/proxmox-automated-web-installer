@@ -53,7 +53,7 @@ Run Maven commands from `app/`. Paths in application configuration are relative 
 | Setting | Purpose | Example |
 |---|---|---|
 | `proxmox.answers.directory` / `PROXMOX_ANSWERS_DIRECTORY` | Directory containing answer templates | `./answers` |
-| `SPRING_PROFILES_ACTIVE` | Runtime profile override; defaults to `development` | `production` for deployment |
+| `SPRING_PROFILES_ACTIVE` | Runtime profile override; defaults to `production` | `development` for local work |
 | `PROXMOX_ROOT_PASSWORD` | Required startup secret, hashed with yescrypt in memory | Protected runtime secret |
 
 Do not commit secrets or pass the password as a command-line argument. Templates
