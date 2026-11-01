@@ -375,8 +375,8 @@ a completed password value.
 - The network cable is connected before boot; installation needs no debug-shell changes.
 - The audit log records `outcome=SUCCESS` for the expected MAC and filename.
 - The deployed service includes the new endpoints; rebuild/redeploy or restart
-  it as needed. Set `SPRING_PROFILES_ACTIVE=production` for deployment rather
-  than relying on the committed `development` default.
+  it as needed. The committed profile defaults to `production`; check
+  `SPRING_PROFILES_ACTIVE` for any environment override.
 - The completion-webhook URL is reachable from the initial installation network;
   after installation, the application log records the expected host's completion.
 - For hosts enabling first boot, the configured script URL returns Bash and its
