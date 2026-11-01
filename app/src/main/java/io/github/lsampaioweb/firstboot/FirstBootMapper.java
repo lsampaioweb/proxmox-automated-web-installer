@@ -14,9 +14,11 @@ class FirstBootMapper {
     if (parameters.size() != 2) {
       throw new FirstBootException(HttpStatus.BAD_REQUEST);
     }
+
     String bridge = singleValue(parameters, "interface");
     String vlan = singleValue(parameters, "vlan-id");
-    if (!bridge.matches("vmbr[0-9]+") || !vlan.matches("[1-9][0-9]{0,3}")
+
+    if (!bridge.matches("vmbr[\\d]+") || !vlan.matches("[1-9][\\d]{0,3}")
         || bridge.length() + 1 + vlan.length() > 15) {
       throw new FirstBootException(HttpStatus.BAD_REQUEST);
     }
