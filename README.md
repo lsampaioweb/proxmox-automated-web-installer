@@ -21,7 +21,7 @@ Serve Proxmox installation answers, log completion, and provide an optional firs
 - Java 25 and Maven 3.9+.
 - Linux `libcrypt` with yescrypt support.
 - Optional for answer validation and ISO preparation: `proxmox-auto-install-assistant` and `xorriso`.
-- On target nodes using the first-boot hook: Bash, ifupdown2, and a reachable DHCP server on the selected VLAN.
+- On target nodes using the first-boot hook: Bash, ifupdown2 for network configuration, and a reachable DHCP server on the selected VLAN.
 - For the tested DHCP-timeout ISO workflow: Ubuntu Bash, `squashfs-tools`, and `sudo`; see the [installation guide](docs/operations/automated-installation.md#longer-dhcp-timeout-tested-workflow).
 - Maven configures JNA native access for `spring-boot:run`. Packaged JAR launches need `--enable-native-access=ALL-UNNAMED`.
 
@@ -109,13 +109,11 @@ The suite renders every committed answer template. If
 `proxmox-auto-install-assistant` is installed and supports the template schema,
 the suite also validates the rendered files with `validate-answer`.
 
-First-boot tests use temporary network files and a controlled validator to test
-the resulting layout, idempotence, failures, and backup. The default validator
-does not parse ifupdown2 configuration. To additionally run the fixtures against
-a real ifupdown2 validator, set `PVE_TEST_IFUP` to an executable accepting
-`--syntax-check -a --interfaces <temporary-file>`. It must only validate syntax,
-never activate networking, and may need root privileges. Validate the real
-parser, switch, DHCP, and first-boot behavior on a Proxmox node; see the
+First-boot tests run the script against temporary network files to test the
+resulting layout, idempotence, a missing bridge, and the backup. They never touch
+a live network configuration. The hook does not check network-file syntax before
+replacement. Verify the switch, DHCP, and first-boot behavior on a Proxmox node;
+see the
 [hook checks](docs/operations/automated-installation.md#installation-hooks).
 
 ## API summary

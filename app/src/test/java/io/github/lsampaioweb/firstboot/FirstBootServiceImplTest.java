@@ -86,7 +86,6 @@ class FirstBootServiceImplTest {
   private FirstBootServiceImpl service;
   private Path script;
   private Path interfaces;
-  private Path validator;
 
   @BeforeEach
   void setUp() throws IOException {
@@ -94,16 +93,6 @@ class FirstBootServiceImplTest {
     script = directory.resolve("first-boot.sh");
     Files.write(script, service.script(PARAMETERS, Locale.ENGLISH));
     interfaces = directory.resolve("interfaces");
-    Path fake = writeExecutable("validator", """
-        #!/bin/bash
-        set -eu
-        [[ "$#" == 4 && "$1" == --syntax-check && "$2" == -a && "$3" == --interfaces ]]
-        [[ "$4" == "$PVE_INTERFACES_FILE".vlan.* ]]
-        grep -q '^iface vmbr0 inet manual$' "$4"
-        grep -q '^iface vmbr0.1110 inet dhcp$' "$4"
-        """);
-    String installedValidator = System.getenv("PVE_TEST_IFUP");
-    validator = installedValidator == null ? fake : Path.of(installedValidator);
   }
 
   @Test
@@ -113,7 +102,7 @@ class FirstBootServiceImplTest {
     assertThat(body).isEqualTo(service.script(PARAMETERS, Locale.forLanguageTag("pt-BR")));
     assertThat(new String(body, StandardCharsets.UTF_8))
         .startsWith("#!/bin/bash\n").contains("bridge='vmbr0'", "vlan_id='1110'")
-        .doesNotContain("__BRIDGE__", "__VLAN_ID__", "ifreload", "reboot", "curl");
+        .doesNotContain("__BRIDGE__", "__VLAN_ID__", "ifreload", "ifup", "reboot", "curl");
     Process syntax = new ProcessBuilder("bash", "-n", script.toString()).start();
     assertThat(syntax.waitFor()).isZero();
   }
@@ -198,53 +187,16 @@ class FirstBootServiceImplTest {
   void failsWithoutChangesWhenTheBridgeIsMissing() throws Exception {
     String input = INITIAL.replace("vmbr0", "vmbr1");
     Files.writeString(interfaces, input);
-    assertThat(runScript(validator).exitCode()).isNotZero();
+    assertThat(runScript().exitCode()).isNotZero();
     assertThat(Files.readString(interfaces)).isEqualTo(input);
     assertThat(backup()).doesNotExist();
     assertNoStagedFiles();
   }
 
-  @Test
-  void validationFailureDoesNotTouchOriginalOrCreateBackup() throws Exception {
-    Files.writeString(interfaces, INITIAL);
-    Path reject = writeExecutable("reject", "#!/bin/bash\nexit 1\n");
-    assertThat(runScript(reject).exitCode()).isNotZero();
-    assertThat(Files.readString(interfaces)).isEqualTo(INITIAL);
-    assertThat(backup()).doesNotExist();
-    assertNoStagedFiles();
-  }
-
-  @Test
-  void publishesExactlyTheValidatedCandidateWithoutSecondValidation() throws Exception {
-    Files.writeString(interfaces, INITIAL);
-    Path captureValidated = writeExecutable("capture-validated", """
-        #!/bin/bash
-        set -eu
-        [[ "$1" == --syntax-check && "$4" != "$PVE_INTERFACES_FILE" ]]
-        [[ ! -e "$PVE_INTERFACES_FILE.validated" ]]
-        cp "$4" "$PVE_INTERFACES_FILE.validated"
-        """);
-    ScriptResult result = runScript(captureValidated);
-    assertThat(result.exitCode()).as("script output: %s", result.output()).isZero();
-    assertThat(Files.readString(interfaces)).isEqualTo(Files.readString(directory.resolve("interfaces.validated")));
-    assertThat(Files.readString(backup())).isEqualTo(INITIAL);
-    assertNoStagedFiles();
-  }
-
-  @Test
-  void missingValidatorFailsWithoutChanges() throws Exception {
-    Files.writeString(interfaces, INITIAL);
-    assertThat(runScript(directory.resolve("missing-validator")).exitCode()).isNotZero();
-    assertThat(Files.readString(interfaces)).isEqualTo(INITIAL);
-    assertThat(backup()).doesNotExist();
-    assertNoStagedFiles();
-  }
-
-  private ScriptResult runScript(Path executable) throws Exception {
+  private ScriptResult runScript() throws Exception {
     Path output = Files.createTempFile(directory, "script-output-", ".log");
     ProcessBuilder builder = new ProcessBuilder("bash", script.toString());
     builder.environment().put("PVE_INTERFACES_FILE", interfaces.toString());
-    builder.environment().put("PVE_IFUP", executable.toString());
     builder.redirectErrorStream(true).redirectOutput(output.toFile());
     Process process = builder.start();
     if (!process.waitFor(30, TimeUnit.SECONDS)) {
@@ -256,17 +208,8 @@ class FirstBootServiceImplTest {
   }
 
   private void assertScriptSucceeds() throws Exception {
-    ScriptResult result = runScript(validator);
+    ScriptResult result = runScript();
     assertThat(result.exitCode()).as("script output: %s", result.output()).isZero();
-  }
-
-  private Path writeExecutable(String name, String contents) throws IOException {
-    Path executable = directory.resolve(name);
-    Files.writeString(executable, contents);
-    Files.setPosixFilePermissions(executable, Set.of(PosixFilePermission.OWNER_READ,
-        PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE));
-
-    return executable;
   }
 
   private Path backup() {

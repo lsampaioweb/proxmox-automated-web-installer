@@ -251,7 +251,6 @@ The endpoint accepts exactly one `interface=vmbr<digits>` and one decimal
 `vlan-id=1..4094`, with no additional parameters. The generated VLAN-interface
 name must fit Linux's 15-character limit. It returns a deterministic Bash
 executable with a shebang, at most 1 MiB; the service does not execute it.
-
 The script makes one small edit to the simple, blank-line-separated
 installer-generated `/etc/network/interfaces`; it is not a general network
 configuration parser. Ansible manages the rest of the network later. Example
@@ -280,17 +279,30 @@ Steps:
    `bridge-vids 1110`, and is followed by the DHCP VLAN stanza. Existing
    `bridge-vlan-aware` and `bridge-vids` settings are replaced; other permitted
    VLANs are not merged. All other lines are copied unchanged.
-3. Validates the copy with `ifup --syntax-check -a --interfaces <copy>`, which
-   checks syntax only.
-4. Saves the original as `/etc/network/interfaces.before-first-boot-vlan` and
+3. Saves the original as `/etc/network/interfaces.before-first-boot-vlan` and
    moves the copy into place. If any step before this fails, the original is
    untouched.
 
+The script does not check the new network file's syntax before replacing the
+original. On pve-01, `ifup --syntax-check` returned a nonzero status while
+warning about the installer's `bridge-fd 0`; the hook no longer runs that
+check. A separate boot-time message reported another running instance, but
+its cause has not been confirmed. An invalid configuration can leave the node
+unreachable, so keep console access and the backup available.
+
 It never starts or reloads networking, reboots, or downloads anything; the
-first-boot hook runs before networking starts, so the new file is used on that
-boot. Errors go to stderr, visible in the first-boot service journal. The syntax
-check does not verify DHCP, routing, or switch connectivity. Test with the real
-ifupdown2 validator on a Proxmox node before relying on the hook.
+first-boot hook runs before networking starts. Check its status and retained
+journal on the Proxmox node:
+
+```bash
+systemctl status proxmox-first-boot-network-pre.service --no-pager -l
+journalctl -u proxmox-first-boot-network-pre.service --no-pager -o short-precise
+```
+
+An unsuccessful hook leaves `/var/lib/proxmox-first-boot/pending-first-boot-setup`
+in place; the marker alone does not establish whether the hook ran. Nothing
+verifies DHCP, routing, or switch connectivity; test on a Proxmox node before
+relying on the hook.
 
 Fetch and inspect, but **do not run on the service host**:
 
@@ -303,8 +315,7 @@ rm -f /tmp/proxmox-first-boot.sh
 ```
 
 For fixture-only tests, the script accepts `PVE_INTERFACES_FILE` to override the
-target file and `PVE_IFUP` to override the syntax validator. Production first
-boot uses the default interfaces path and installed ifupdown2.
+target file. Production first boot uses `/etc/network/interfaces`.
 
 Before installation, configure switch tagging and Fortigate DHCP reservations
 for VLAN 1110. Proxmox recommends predictable management addressing; DHCP is
@@ -316,8 +327,7 @@ rewrite hostname resolution.** Ensure subsequent provisioning handles that
 mapping before relying on Proxmox management services or cluster formation.
 Test the first installation with console access available.
 
-See the [official hook documentation](https://pve.proxmox.com/wiki/Automated_Installation)
-and [ifupdown2 syntax-check options](https://manpages.debian.org/bookworm/ifupdown2/ifup.8.en.html).
+See the [official hook documentation](https://pve.proxmox.com/wiki/Automated_Installation).
 
 ## Write the USB installer
 

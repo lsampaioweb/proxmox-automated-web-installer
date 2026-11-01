@@ -7,9 +7,8 @@ bridge='__BRIDGE__'
 vlan_id='__VLAN_ID__'
 vlan_interface="${bridge}.${vlan_id}"
 
-# Tests override these two values; Proxmox uses the defaults.
+# Tests override this value; Proxmox uses the default.
 interfaces_file="${PVE_INTERFACES_FILE:-/etc/network/interfaces}"
-validator="${PVE_IFUP:-ifup}"
 
 if grep -qx "iface ${vlan_interface} inet dhcp" "$interfaces_file"; then
   echo "${vlan_interface} is already configured. Nothing to do."
@@ -50,9 +49,6 @@ awk -v bridge="$bridge" -v vlan_id="$vlan_id" -v vlan_interface="$vlan_interface
 
   END { if (in_bridge) add_vlan() }
 ' "$interfaces_file" > "$new_file"
-
-# Check the syntax only. This does not touch the running network.
-"$validator" --syntax-check -a --interfaces "$new_file"
 
 cp -p "$interfaces_file" "${interfaces_file}.before-first-boot-vlan"
 mv -f "$new_file" "$interfaces_file"

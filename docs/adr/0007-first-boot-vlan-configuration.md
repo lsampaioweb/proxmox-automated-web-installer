@@ -45,15 +45,13 @@ user-owned and must be preserved.
   management address on the VLAN.
 - Exit without changes when the VLAN DHCP stanza already exists, without
   verifying the rest of the configuration; fail without changes when the
-  bridge is missing. Validate the new file with
-  `ifup --syntax-check -a --interfaces <candidate>` (the Proxmox ifupdown2
-  package supports an alternate file on `ifup`, not `ifreload`), keep a backup,
-  then move the file into place. Never run network activation, reload, or
-  equivalent commands.
+  bridge is missing. Keep a backup, then move the new file into place without
+  checking its network configuration syntax. On pve-01, `ifup --syntax-check`
+  returned a nonzero status and warned about the installer's `bridge-fd 0`.
+  Never run network activation, reload, or equivalent commands.
 - Support an initially untagged installer-created bridge; an existing VLAN
-  subinterface is not required. Verify the supported input layout and
-  `ifupdown2` validation approach against a representative Proxmox-generated
-  configuration before implementation is considered complete.
+  subinterface is not required. The supported input layout is the
+  Proxmox-generated file seen on pve-01.
 - Answer files provide the bridge and VLAN values. Do not hard-code an
   application-side VLAN-to-physical-interface mapping. Preserve the current
   Home values `vmbr0` and `1110`; do not change other answer files unless their
@@ -83,18 +81,16 @@ changes to any other route.
 
 Use existing feature, service, controller, localization, and error-handling
 conventions. Test parameter validation, script content type and size, the exact
-resulting Home layout, idempotence, missing bridge, validation failure, backup,
-and replacement using temporary files only. Verify Bash syntax. Tests must not
+resulting Home layout, idempotence, missing bridge, backup, and replacement
+using temporary files only. Verify Bash syntax. Tests must not
 modify a live network configuration or activate networking. Update operational
 documentation for the URL parameters, script behavior, and internal-network
 boundary.
 
 Following the approved simplification, the script is a short, readable edit of
 the installer-generated layout, not a general network-file parser or
-transaction system. Layout validation beyond the syntax check is left to
-Ansible. The default fixture validator does not parse ifupdown2 configuration;
-validate the real parser and first-boot behavior on a Proxmox node before
-relying on the hook.
+transaction system. Test first-boot execution and connectivity on a Proxmox
+node before relying on the hook.
 
 ## Out of scope
 
