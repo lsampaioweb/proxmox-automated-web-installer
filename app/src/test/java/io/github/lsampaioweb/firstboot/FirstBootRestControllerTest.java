@@ -51,17 +51,17 @@ class FirstBootRestControllerTest {
   @Test
   void returnsScriptBytesAndPassesParametersToService() throws Exception {
     byte[] script = "#!/bin/bash\n".getBytes(StandardCharsets.UTF_8);
-    when(service.script(any(), any())).thenReturn(script);
+    when(service.script(any(), any(), any())).thenReturn(script);
     mockMvc.perform(get("/first-boot").param("interface", "vmbr0").param("vlan-id", "1110"))
         .andExpect(status().isOk())
         .andExpect(content().contentType("text/x-shellscript"))
         .andExpect(content().bytes(script));
-    verify(service).script(Map.of("interface", List.of("vmbr0"), "vlan-id", List.of("1110")), Locale.ENGLISH);
+    verify(service).script(Map.of("interface", List.of("vmbr0"), "vlan-id", List.of("1110")), "127.0.0.1", Locale.ENGLISH);
   }
 
   @Test
   void preservesDuplicateValuesForServiceValidationAndLocalizesErrors() throws Exception {
-    when(service.script(any(), any())).thenThrow(new FirstBootException(HttpStatus.BAD_REQUEST));
+    when(service.script(any(), any(), any())).thenThrow(new FirstBootException(HttpStatus.BAD_REQUEST));
     mockMvc.perform(get("/first-boot").header("Accept-Language", "pt-BR")
         .param("interface", "vmbr0").param("vlan-id", "1110", "3"))
         .andExpect(status().isBadRequest())
@@ -69,7 +69,7 @@ class FirstBootRestControllerTest {
         .andExpect(jsonPath("$.errorCode").value("FIRST_BOOT_PARAMETERS_INVALID"))
         .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.startsWith("Informe exatamente")));
     verify(service).script(eq(Map.of("interface", List.of("vmbr0"), "vlan-id", List.of("1110", "3"))),
-        eq(Locale.forLanguageTag("pt-BR")));
+        eq("127.0.0.1"), eq(Locale.forLanguageTag("pt-BR")));
   }
 
   @Test

@@ -26,6 +26,6 @@ class FirstBootRestController {
   public ResponseEntity<byte[]> script(@RequestParam MultiValueMap<String, String> parameters,
       HttpServletRequest request) {
     return ResponseEntity.ok().contentType(SHELL_SCRIPT)
-        .body(service.script(parameters, RequestContextUtils.getLocale(request)));
+        .body(service.script(parameters, request.getRemoteAddr(), RequestContextUtils.getLocale(request)));
   }
 }

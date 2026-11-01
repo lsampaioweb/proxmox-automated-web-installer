@@ -2,6 +2,7 @@ package io.github.lsampaioweb.firstboot;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,6 +21,7 @@ import io.github.lsampaioweb.core.i18n.LogMessages;
 class FirstBootServiceImpl implements FirstBootService {
 
   private static final String SCRIPT_RESOURCE = "first-boot/network-vlan.sh";
+  private static final String LOG_SCRIPT_SERVED = "log.first.boot.served";
   private static final String LOG_SCRIPT_FAILED = "log.first.boot.failed";
   private static final int MAX_SCRIPT_BYTES = 1024 * 1024;
 
@@ -27,7 +29,7 @@ class FirstBootServiceImpl implements FirstBootService {
   private final LogMessages logMessages;
 
   @Override
-  public byte[] script(Map<String, List<String>> parameters, Locale locale) {
+  public byte[] script(Map<String, List<String>> parameters, String clientAddress, Locale locale) {
     FirstBootConfiguration configuration = mapper.toConfiguration(parameters);
     String template;
     try {
@@ -42,6 +44,9 @@ class FirstBootServiceImpl implements FirstBootService {
       log.error(logMessages.get(locale, LOG_SCRIPT_FAILED));
       throw new FirstBootException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    log.info(logMessages.get(locale, LOG_SCRIPT_SERVED, Instant.now(), LogMessages.safeField(clientAddress),
+        configuration.bridge(), Integer.toString(configuration.vlanId()), Integer.toString(script.length)));
 
     return script;
   }

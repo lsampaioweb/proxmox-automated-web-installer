@@ -56,6 +56,10 @@ user-owned and must be preserved.
   application-side VLAN-to-physical-interface mapping. Preserve the current
   Home values `vmbr0` and `1110`; do not change other answer files unless their
   intended values are established.
+- Log each successfully rendered script at INFO with timestamp, client
+  address, bridge, VLAN ID, and size, through localized log keys. Sanitize the
+  client address; rejections keep the existing hook-rejection log without
+  query values. The success log does not confirm download or execution.
 - Keep the endpoint internal and use HTTP as currently requested. Do not change
   existing endpoint or Actuator behavior. This feature has no callback,
   database, application-side persistent state, or dependency on the

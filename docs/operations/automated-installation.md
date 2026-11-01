@@ -251,6 +251,11 @@ The endpoint accepts exactly one `interface=vmbr<digits>` and one decimal
 `vlan-id=1..4094`, with no additional parameters. The generated VLAN-interface
 name must fit Linux's 15-character limit. It returns a deterministic Bash
 executable with a shebang, at most 1 MiB; the service does not execute it.
+Each successfully rendered script is logged (`First-boot script served`) with
+the client address as seen by the service, interface, VLAN ID, and size; a
+rejected request logs only its error code. This log records script generation,
+not a completed download, execution, or working VLAN connectivity.
+
 The script makes one small edit to the simple, blank-line-separated
 installer-generated `/etc/network/interfaces`; it is not a general network
 configuration parser. Ansible manages the rest of the network later. Example

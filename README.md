@@ -91,7 +91,8 @@ not intended as public APIs.
 Request logs use the request's locale; logs without a request use the configured
 default locale. Audit fields include `mac`, `file`, `outcome`, `errorCode`, and
 `latencyMs`; request JSON, answer contents, and password material are never
-logged.
+logged. The first-boot success log records script generation, not a completed
+download or successful execution on the node.
 
 Message-bundle lookup permits fallback to the host's system locale
 (`spring.messages.fallback-to-system-locale=true`). The API locale resolver
