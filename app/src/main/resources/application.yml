@@ -11,8 +11,8 @@ spring:
       enabled: true
   profiles:
     active:
-      - "development"
-      # - "production"
+      # - "development"
+      - "production"
 
 logging:
   config: "classpath:log/logback-spring.xml"
