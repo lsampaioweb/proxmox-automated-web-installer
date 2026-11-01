@@ -30,7 +30,7 @@ Run Maven commands from `app/`. Paths in application configuration are relative 
 | Setting | Purpose | Example |
 |---|---|---|
 | `proxmox.answers.directory` / `PROXMOX_ANSWERS_DIRECTORY` | Directory containing answer templates | `./answers` |
-| `SPRING_PROFILES_ACTIVE` | Runtime profile override | `development` |
+| `SPRING_PROFILES_ACTIVE` | Runtime profile override; defaults to `development` | `production` for deployment |
 | `PROXMOX_ROOT_PASSWORD` | Required startup secret, hashed with yescrypt in memory | Protected runtime secret |
 
 Do not commit secrets or pass the password as a command-line argument. Templates
@@ -89,6 +89,10 @@ Request logs use the request's locale; logs without a request use the configured
 default locale. Audit fields include `mac`, `file`, `outcome`, `errorCode`, and
 `latencyMs`; request JSON, answer contents, and password material are never
 logged.
+
+Message-bundle lookup permits fallback to the host's system locale
+(`spring.messages.fallback-to-system-locale=true`). The API locale resolver
+still defaults to English and supports English and Brazilian Portuguese.
 
 ## Tests
 

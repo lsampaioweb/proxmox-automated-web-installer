@@ -5,14 +5,14 @@ spring:
     basename: "i18n/messages"
     encoding: "UTF-8"
     default-locale: "en"
-    fallback-to-system-locale: false
+    fallback-to-system-locale: true
   threads:
     virtual:
       enabled: true
   profiles:
     active:
-      # - "development"
-      - "production"
+      - "development"
+      # - "production"
 
 logging:
   config: "classpath:log/logback-spring.xml"
