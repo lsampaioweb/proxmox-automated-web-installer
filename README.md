@@ -20,9 +20,9 @@ Proxmox VE's installer, including [automated installation](https://pve.proxmox.c
 ## The Solution
 
 1. Boot the node from the prepared USB on an untagged (native VLAN) port; the installer fetches its answer file from `POST /answer`.
-2. During installation, Proxmox downloads the first-boot script from `GET /first-boot?interface=vmbr0&vlan-id=1110`.
-3. On the first boot, before networking starts, the script turns the bridge into a VLAN-aware bridge and adds `vmbr0.<vlan-id>` with DHCP.
-4. The node reports completion to `POST /api/v1/post-install-events`; with a matching DHCP reservation and switch configuration, its management interface receives an address on the VLAN without a manual network edit.
+2. During installation, Proxmox downloads the first-boot script from `GET /api/v1/first-boot?interface=vmbr0&vlan-id=1110`.
+3. On the first boot, before networking starts, the script turns the bridge into a VLAN-aware bridge and adds `vmbr0.<vlan-id>` with DHCP. With a matching DHCP reservation and switch configuration, the management interface receives an address on the VLAN without a manual network edit.
+4. Separately, the installer reports completion to `POST /api/v1/post-install-events`; this webhook does not confirm first-boot execution or connectivity.
 
 ```text
 auto vmbr0
@@ -100,7 +100,7 @@ SPRING_PROFILES_ACTIVE=production mvn spring-boot:run
 
 - Answer endpoint: `POST http://localhost:8080/answer` (application upstream).
 - Completion webhook: `POST http://localhost:8080/api/v1/post-install-events`.
-- First-boot script: `GET http://localhost:8080/first-boot?interface=vmbr0&vlan-id=1110`.
+- First-boot script: `GET http://localhost:8080/api/v1/first-boot?interface=vmbr0&vlan-id=1110`.
 - Optional HTTPS client URL: `https://your-proxy-host/answer`.
 - Health endpoint: `GET http://localhost:8080/actuator/health`.
 - OpenAPI JSON (development only): `http://localhost:8080/v3/api-docs`.
@@ -143,7 +143,7 @@ see the
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON / validation / MAC errors; `413` body over 1 MiB; `404` no matching file; `405` wrong method; `415` wrong Content-Type; `500` unreadable file, invalid TOML, invalid template, or internal error |
-| `GET` | `/first-boot` | `200` + `text/x-shellscript` | `400` missing, repeated, extra, or invalid parameters; `405` wrong method; `500` script unavailable |
+| `GET` | `/api/v1/first-boot` | `200` + `text/x-shellscript` | `400` missing, repeated, extra, or invalid parameters; `405` wrong method; `500` script unavailable |
 | `POST` | `/api/v1/post-install-events` | `200` + JSON receipt | `400` invalid JSON / metadata; `413` body over 1 MiB; `405` wrong method; `415` wrong Content-Type |
 
 Errors use `application/json` with a localized message and stable `errorCode`.

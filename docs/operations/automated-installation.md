@@ -238,8 +238,11 @@ Home pve-01 and pve-02 already use:
 [first-boot]
 source = "from-url"
 ordering = "before-network"
-url = "http://proxmox-auto-install-assistant.lan.homelab:8080/first-boot?interface=vmbr0&vlan-id=1110"
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/first-boot?interface=vmbr0&vlan-id=1110"
 ```
+
+Deploy the updated service before using these answer templates; the previous
+unversioned first-boot route is no longer available.
 
 Proxmox **downloads the script during installation**, while the untagged
 network is available, then executes its local copy before networking on the
@@ -312,7 +315,7 @@ relying on the hook.
 Fetch and inspect, but **do not run on the service host**:
 
 ```bash
-curl -fsS 'http://localhost:8080/first-boot?interface=vmbr0&vlan-id=1110' \
+curl -fsS 'http://localhost:8080/api/v1/first-boot?interface=vmbr0&vlan-id=1110' \
   -o /tmp/proxmox-first-boot.sh
 bash -n /tmp/proxmox-first-boot.sh
 wc -c /tmp/proxmox-first-boot.sh

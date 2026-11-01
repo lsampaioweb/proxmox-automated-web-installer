@@ -52,7 +52,7 @@ class FirstBootRestControllerTest {
   void returnsScriptBytesAndPassesParametersToService() throws Exception {
     byte[] script = "#!/bin/bash\n".getBytes(StandardCharsets.UTF_8);
     when(service.script(any(), any(), any())).thenReturn(script);
-    mockMvc.perform(get("/first-boot").param("interface", "vmbr0").param("vlan-id", "1110"))
+    mockMvc.perform(get("/api/v1/first-boot").param("interface", "vmbr0").param("vlan-id", "1110"))
         .andExpect(status().isOk())
         .andExpect(content().contentType("text/x-shellscript"))
         .andExpect(content().bytes(script));
@@ -62,7 +62,7 @@ class FirstBootRestControllerTest {
   @Test
   void preservesDuplicateValuesForServiceValidationAndLocalizesErrors() throws Exception {
     when(service.script(any(), any(), any())).thenThrow(new FirstBootException(HttpStatus.BAD_REQUEST));
-    mockMvc.perform(get("/first-boot").header("Accept-Language", "pt-BR")
+    mockMvc.perform(get("/api/v1/first-boot").header("Accept-Language", "pt-BR")
         .param("interface", "vmbr0").param("vlan-id", "1110", "3"))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -74,6 +74,6 @@ class FirstBootRestControllerTest {
 
   @Test
   void rejectsWrongMethod() throws Exception {
-    mockMvc.perform(post("/first-boot")).andExpect(status().isMethodNotAllowed());
+    mockMvc.perform(post("/api/v1/first-boot")).andExpect(status().isMethodNotAllowed());
   }
 }

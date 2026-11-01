@@ -16,7 +16,7 @@ Source files are never modified. Secrets are never logged.
 
 During setup, Proxmox configures an untagged network interface and pins its name.
 All nine templates send completion reports to `/api/v1/post-install-events`.
-Only Home pve-01 and pve-02 enable `/first-boot?interface=vmbr0&vlan-id=1110`:
+Only Home pve-01 and pve-02 enable `/api/v1/first-boot?interface=vmbr0&vlan-id=1110`:
 the script sets `vmbr0` to VLAN-aware `manual` and adds `vmbr0.1110` with
 DHCP. Ansible still manages bonds and other configuration afterward.
 

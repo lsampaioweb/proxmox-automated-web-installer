@@ -13,7 +13,7 @@ user's current Home answer files specify:
 [first-boot]
 source = "from-url"
 ordering = "before-network"
-url = "http://proxmox-auto-install-assistant.lan.homelab:8080/first-boot?interface=vmbr0&vlan-id=1110"
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/first-boot?interface=vmbr0&vlan-id=1110"
 ```
 
 Proxmox downloads a `from-url` executable during installation; the
@@ -23,9 +23,9 @@ user-owned and must be preserved.
 
 ## Decision
 
-- Add anonymous `GET /first-boot` with required `interface` and `vlan-id`
+- Add anonymous `GET /api/v1/first-boot` with required `interface` and `vlan-id`
   query parameters. For example:
-  `/first-boot?interface=vmbr0&vlan-id=1110`.
+  `/api/v1/first-boot?interface=vmbr0&vlan-id=1110`.
 - Validate `interface` as a bridge name (`vmbr` followed by decimal digits)
   and `vlan-id` as a decimal 802.1Q VLAN ID from 1 through 4094. Reject missing,
   repeated, malformed, or out-of-range values using the existing localized JSON
@@ -67,7 +67,7 @@ user-owned and must be preserved.
 
 ## Approved Instruction overrides
 
-For `GET /first-boot` only:
+For `GET /api/v1/first-boot` only:
 
 - `spring-boot-project.instructions.md`: the private-API Spring Security
   requirement is overridden.

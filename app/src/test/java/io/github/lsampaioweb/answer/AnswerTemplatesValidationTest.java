@@ -71,7 +71,7 @@ class AnswerTemplatesValidationTest {
 
         if (mac.equals("60:be:b4:08:f7:66") || mac.equals("00:d0:b4:01:77:7a")) {
           assertThat(body).contains("[first-boot]", "ordering = \"before-network\"",
-              "/first-boot?interface=vmbr0&vlan-id=1110");
+              "/api/v1/first-boot?interface=vmbr0&vlan-id=1110");
         } else {
           assertThat(body).doesNotContain("[first-boot]");
         }

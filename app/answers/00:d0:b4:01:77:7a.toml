@@ -32,7 +32,7 @@ disk-list = ["sda"]
 [first-boot]
 source = "from-url"
 ordering = "before-network"
-url = "http://proxmox-auto-install-assistant.lan.homelab:8080/first-boot?interface=vmbr0&vlan-id=1110"
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/first-boot?interface=vmbr0&vlan-id=1110"
 
 [post-installation-webhook]
 url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/post-install-events"

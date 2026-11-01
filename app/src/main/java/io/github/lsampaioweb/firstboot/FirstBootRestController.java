@@ -22,7 +22,7 @@ class FirstBootRestController {
   private final FirstBootService service;
 
   /** Returns the executable downloaded by Proxmox during installation. */
-  @GetMapping("/first-boot")
+  @GetMapping("/api/v1/first-boot")
   public ResponseEntity<byte[]> script(@RequestParam MultiValueMap<String, String> parameters,
       HttpServletRequest request) {
     return ResponseEntity.ok().contentType(SHELL_SCRIPT)
