@@ -1,20 +1,41 @@
-# Proxmox Web Installer
-
-Spring Boot service for Proxmox automated installation: answer delivery, completion logging, and an optional first-boot VLAN script.
+# Proxmox Web Installer: Automated Proxmox VE Install with VLAN Support
 
 ## Purpose
 
-Serve Proxmox installation answers, log completion, and provide an optional first-boot DHCP VLAN script.
+Automate Proxmox VE installation and configure its management VLAN with DHCP on first boot.
 
 ## Overview
 
-- Exposes `POST /answer` for the Proxmox HTTP answer source.
-- Tries installer-reported MAC addresses in request order and matches filenames case-insensitively.
-- Reads operator-managed TOML templates from a configurable directory.
-- Renders the root-password hash in memory and returns TOML.
-- Localizes API errors and request logs; audit records omit request bodies and answer contents.
-- Receives installation-completion webhooks without storing the payload.
-- Serves a first-boot script for DHCP VLAN configuration on installer-generated bridges.
+- Serves Proxmox unattended-install answer files over HTTP.
+- Works around the installer's lack of an automated management VLAN setting by applying VLAN configuration before first-boot networking.
+- Records installation completion through a webhook.
+- Supports DHCP-based management addressing and host-specific answer templates.
+
+## The Problem
+
+Proxmox VE's installer, including [automated installation](https://pve.proxmox.com/wiki/Automated_Installation), does not provide an automated-installation option to assign a VLAN tag to the management interface. Nodes on a VLAN-only network cannot reach the installer's network or answer server, and the usual manual fix is to log in to every server and edit `/etc/network/interfaces`.
+
+**Install Proxmox VE unattended even when the management network requires a tagged VLAN.** Start installation on an untagged/native network; this service supplies the answer file and applies the VLAN configuration on first boot.
+
+## The Solution
+
+1. Boot the node from the prepared USB on an untagged (native VLAN) port; the installer fetches its answer file from `POST /answer`.
+2. During installation, Proxmox downloads the first-boot script from `GET /first-boot?interface=vmbr0&vlan-id=1110`.
+3. On the first boot, before networking starts, the script turns the bridge into a VLAN-aware bridge and adds `vmbr0.<vlan-id>` with DHCP.
+4. The node reports completion to `POST /api/v1/post-install-events`; with a matching DHCP reservation and switch configuration, its management interface receives an address on the VLAN without a manual network edit.
+
+```text
+auto vmbr0
+iface vmbr0 inet manual
+        bridge-ports enp2lacp3
+        bridge-vlan-aware yes
+        bridge-vids 1110
+
+auto vmbr0.1110
+iface vmbr0.1110 inet dhcp
+```
+
+Verified on Proxmox VE 9.2. The first-boot script is intentionally limited to the VLAN change; pair it with Ansible for the full network configuration.
 
 ## Prerequisites
 
