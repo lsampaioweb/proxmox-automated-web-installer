@@ -143,8 +143,8 @@ see the
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON / validation / MAC errors; `413` body over 1 MiB; `404` no matching file; `405` wrong method; `415` wrong Content-Type; `500` unreadable file, invalid TOML, invalid template, or internal error |
-| `POST` | `/api/v1/post-install-events` | `200` + JSON receipt | `400` invalid JSON / metadata; `413` body over 1 MiB; `405` wrong method; `415` wrong Content-Type |
 | `GET` | `/first-boot` | `200` + `text/x-shellscript` | `400` missing, repeated, extra, or invalid parameters; `405` wrong method; `500` script unavailable |
+| `POST` | `/api/v1/post-install-events` | `200` + JSON receipt | `400` invalid JSON / metadata; `413` body over 1 MiB; `405` wrong method; `415` wrong Content-Type |
 
 Errors use `application/json` with a localized message and stable `errorCode`.
 
