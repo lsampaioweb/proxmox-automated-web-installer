@@ -16,7 +16,16 @@ Source files are never modified. Secrets are never logged.
 
 During setup, Proxmox configures an untagged network interface and pins its name.
 All nine templates send completion reports to `/api/v1/post-install-events`.
-Ansible configures bonds and VLANs after installation. See [installation hooks](../../docs/operations/automated-installation.md#installation-hooks).
+Only Home pve-01 and pve-02 enable `/first-boot?interface=vmbr0&vlan-id=1110`:
+the script sets `vmbr0` to VLAN-aware `manual` and adds `vmbr0.1110` with
+DHCP. Ansible still manages bonds and other configuration afterward.
+
+`network.source = "from-dhcp"` obtains installer settings through DHCP but
+writes a static installed configuration. The optional first-boot hook explicitly
+removes that static management addressing and uses DHCP on the VLAN. Configure
+Fortigate reservations and switch tagging before booting the installed node.
+Other hosts have no first-boot VLAN policy until their intended values are
+established. See [installation hooks](../../docs/operations/automated-installation.md#installation-hooks).
 
 ## Configure the root password
 

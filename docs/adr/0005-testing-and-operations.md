@@ -7,7 +7,7 @@
 
 ## Context
 
-Answer delivery depends on request shape, MAC validation, lookup order, filesystem state, symlink handling, password rendering, and audit logging. ADR-0006 adds webhook tests. Proxmox provides `validate-answer` for checking rendered files.
+Answer delivery depends on request shape, MAC validation, lookup order, filesystem state, symlink handling, password rendering, and audit logging. ADR-0006 and ADR-0007 add separate hook tests. Proxmox provides `validate-answer` for checking rendered files.
 
 ## Decision
 

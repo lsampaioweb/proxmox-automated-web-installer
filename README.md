@@ -1,10 +1,10 @@
 # Proxmox Web Installer
 
-Spring Boot service for Proxmox automated installation: answer delivery and completion logging.
+Spring Boot service for Proxmox automated installation: answer delivery, completion logging, and an optional first-boot VLAN script.
 
 ## Purpose
 
-Serve Proxmox installation answers and log completion.
+Serve Proxmox installation answers, log completion, and provide an optional first-boot DHCP VLAN script.
 
 ## Overview
 
@@ -14,12 +14,14 @@ Serve Proxmox installation answers and log completion.
 - Renders the root-password hash in memory and returns TOML.
 - Localizes API errors and request logs; audit records omit request bodies and answer contents.
 - Receives installation-completion webhooks without storing the payload.
+- Serves a first-boot script for DHCP VLAN configuration on installer-generated bridges.
 
 ## Prerequisites
 
 - Java 25 and Maven 3.9+.
 - Linux `libcrypt` with yescrypt support.
 - Optional for answer validation and ISO preparation: `proxmox-auto-install-assistant` and `xorriso`.
+- On target nodes using the first-boot hook: Bash, ifupdown2, and a reachable DHCP server on the selected VLAN.
 - For the tested DHCP-timeout ISO workflow: Ubuntu Bash, `squashfs-tools`, and `sudo`; see the [installation guide](docs/operations/automated-installation.md#longer-dhcp-timeout-tested-workflow).
 - Maven configures JNA native access for `spring-boot:run`. Packaged JAR launches need `--enable-native-access=ALL-UNNAMED`.
 
@@ -77,6 +79,7 @@ SPRING_PROFILES_ACTIVE=production mvn spring-boot:run
 
 - Answer endpoint: `POST http://localhost:8080/answer` (application upstream).
 - Completion webhook: `POST http://localhost:8080/api/v1/post-install-events`.
+- First-boot script: `GET http://localhost:8080/first-boot?interface=vmbr0&vlan-id=1110`.
 - Optional HTTPS client URL: `https://your-proxy-host/answer`.
 - Health endpoint: `GET http://localhost:8080/actuator/health`.
 - OpenAPI JSON (development only): `http://localhost:8080/v3/api-docs`.
@@ -106,12 +109,22 @@ The suite renders every committed answer template. If
 `proxmox-auto-install-assistant` is installed and supports the template schema,
 the suite also validates the rendered files with `validate-answer`.
 
+First-boot tests use temporary network files and a controlled validator to test
+the resulting layout, idempotence, failures, and backup. The default validator
+does not parse ifupdown2 configuration. To additionally run the fixtures against
+a real ifupdown2 validator, set `PVE_TEST_IFUP` to an executable accepting
+`--syntax-check -a --interfaces <temporary-file>`. It must only validate syntax,
+never activate networking, and may need root privileges. Validate the real
+parser, switch, DHCP, and first-boot behavior on a Proxmox node; see the
+[hook checks](docs/operations/automated-installation.md#installation-hooks).
+
 ## API summary
 
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON / validation / MAC errors; `413` body over 1 MiB; `404` no matching file; `405` wrong method; `415` wrong Content-Type; `500` unreadable file, invalid TOML, invalid template, or internal error |
 | `POST` | `/api/v1/post-install-events` | `200` + JSON receipt | `400` invalid JSON / metadata; `413` body over 1 MiB; `405` wrong method; `415` wrong Content-Type |
+| `GET` | `/first-boot` | `200` + `text/x-shellscript` | `400` missing, repeated, extra, or invalid parameters; `405` wrong method; `500` script unavailable |
 
 Errors use `application/json` with a localized message and stable `errorCode`.
 

@@ -197,7 +197,8 @@ ISO's embedded contents.
 
 ## Installation hooks
 
-The webhook reports successful installation.
+The hooks are independent. The webhook reports successful installation; it
+does **not** confirm first-boot execution or VLAN connectivity.
 
 ### Completion webhook
 
@@ -228,6 +229,95 @@ optional system UUID, and interface names/MACs only. It does not retain the
 payload or log serials, addresses, disks, udev properties, machine IDs, SSH
 keys, or unknown fields. There is no database, webhook-triggered action, or
 separate completion-record store.
+
+### First-boot DHCP VLAN
+
+Home pve-01 and pve-02 already use:
+
+```toml
+[first-boot]
+source = "from-url"
+ordering = "before-network"
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/first-boot?interface=vmbr0&vlan-id=1110"
+```
+
+Proxmox **downloads the script during installation**, while the untagged
+network is available, then executes its local copy before networking on the
+installed node's first boot. It does not fetch a script after losing network
+access. First-boot hooks require a compatible ISO (PVE 8.3+); these templates'
+interface-name pinning requires PVE 9.1+.
+
+The endpoint accepts exactly one `interface=vmbr<digits>` and one decimal
+`vlan-id=1..4094`, with no additional parameters. The generated VLAN-interface
+name must fit Linux's 15-character limit. It returns a deterministic Bash
+executable with a shebang, at most 1 MiB; the service does not execute it.
+
+The script makes one small edit to the simple, blank-line-separated
+installer-generated `/etc/network/interfaces`; it is not a general network
+configuration parser. Ansible manages the rest of the network later. Example
+result for `interface=vmbr0&vlan-id=1110`:
+
+```text
+auto vmbr0
+iface vmbr0 inet manual
+        bridge-ports enp2lacp3
+        bridge-stp off
+        bridge-fd 0
+        bridge-vlan-aware yes
+        bridge-vids 1110
+
+auto vmbr0.1110
+iface vmbr0.1110 inet dhcp
+```
+
+Steps:
+
+1. Exits without changes if `iface vmbr0.1110 inet dhcp` already exists; it
+   does not verify the rest of the configuration in that case. Fails if `vmbr0`
+   is not defined.
+2. Writes a copy where the `vmbr0` stanza becomes `inet manual`, loses its
+   static `address`/`netmask`/`gateway`, gains `bridge-vlan-aware yes` and
+   `bridge-vids 1110`, and is followed by the DHCP VLAN stanza. Existing
+   `bridge-vlan-aware` and `bridge-vids` settings are replaced; other permitted
+   VLANs are not merged. All other lines are copied unchanged.
+3. Validates the copy with `ifup --syntax-check -a --interfaces <copy>`, which
+   checks syntax only.
+4. Saves the original as `/etc/network/interfaces.before-first-boot-vlan` and
+   moves the copy into place. If any step before this fails, the original is
+   untouched.
+
+It never starts or reloads networking, reboots, or downloads anything; the
+first-boot hook runs before networking starts, so the new file is used on that
+boot. Errors go to stderr, visible in the first-boot service journal. The syntax
+check does not verify DHCP, routing, or switch connectivity. Test with the real
+ifupdown2 validator on a Proxmox node before relying on the hook.
+
+Fetch and inspect, but **do not run on the service host**:
+
+```bash
+curl -fsS 'http://localhost:8080/first-boot?interface=vmbr0&vlan-id=1110' \
+  -o /tmp/proxmox-first-boot.sh
+bash -n /tmp/proxmox-first-boot.sh
+wc -c /tmp/proxmox-first-boot.sh
+rm -f /tmp/proxmox-first-boot.sh
+```
+
+For fixture-only tests, the script accepts `PVE_INTERFACES_FILE` to override the
+target file and `PVE_IFUP` to override the syntax validator. Production first
+boot uses the default interfaces path and installed ifupdown2.
+
+Before installation, configure switch tagging and Fortigate DHCP reservations
+for VLAN 1110. Proxmox recommends predictable management addressing; DHCP is
+the chosen local policy, so stable reservations are important. After boot,
+verify `ip -4 address show vmbr0.1110`, the default route, DNS, and that
+`getent hosts "$(hostname -f)"` resolves to the reserved VLAN address.
+**The installer may leave its old address in `/etc/hosts`; this script does not
+rewrite hostname resolution.** Ensure subsequent provisioning handles that
+mapping before relying on Proxmox management services or cluster formation.
+Test the first installation with console access available.
+
+See the [official hook documentation](https://pve.proxmox.com/wiki/Automated_Installation)
+and [ifupdown2 syntax-check options](https://manpages.debian.org/bookworm/ifupdown2/ifup.8.en.html).
 
 ## Write the USB installer
 
@@ -269,3 +359,14 @@ a completed password value.
 - A DNS-based answer URL resolves through the installer network's DHCP-provided DNS.
 - The network cable is connected before boot; installation needs no debug-shell changes.
 - The audit log records `outcome=SUCCESS` for the expected MAC and filename.
+- The deployed service includes the new endpoints; rebuild/redeploy or restart
+  it as needed. Set `SPRING_PROFILES_ACTIVE=production` for deployment rather
+  than relying on the committed `development` default.
+- The completion-webhook URL is reachable from the initial installation network;
+  after installation, the application log records the expected host's completion.
+- For hosts enabling first boot, the configured script URL returns Bash and its
+  downloaded content passes `bash -n` before installation.
+- VLAN tagging and DHCP reservations are ready, and console access is available.
+- After a first-boot migration, the interfaces backup exists, the VLAN interface
+  has its reserved address, and routing, DNS, and hostname resolution are correct.
+  Webhook receipt alone does not verify these checks.

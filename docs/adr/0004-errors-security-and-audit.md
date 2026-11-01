@@ -21,7 +21,7 @@ Requests rejected before the service (invalid JSON, validation failures, oversiz
 
 The root password is supplied through protected runtime configuration and hashed once at startup using yescrypt. `crypt(3)` is not thread-safe and must remain on the startup path only.
 
-Internal HTTP is approved for answer delivery and the completion webhook. HTTPS via an internal reverse proxy remains optional and recommended for transport protection. The application rejects request bodies larger than 1 MiB before message conversion; any reverse proxy should enforce the same or a stricter limit. Application-level authentication remains disabled; the internal network boundary is mandatory.
+Internal HTTP is approved for answer delivery and both hooks. HTTPS via an internal reverse proxy remains optional and recommended for transport protection. The application rejects request bodies larger than 1 MiB before message conversion; any reverse proxy should enforce the same or a stricter limit. Application-level authentication remains disabled; the internal network boundary is mandatory.
 
 Webhook success logs use only the allowlist in ADR-0006, not the richer answer-request audit metadata. Hook rejections log an error code without the request body or query values.
 

@@ -69,6 +69,13 @@ class AnswerTemplatesValidationTest {
             .contains("[post-installation-webhook]")
             .contains("url = \"http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/post-install-events\"");
 
+        if (mac.equals("60:be:b4:08:f7:66") || mac.equals("00:d0:b4:01:77:7a")) {
+          assertThat(body).contains("[first-boot]", "ordering = \"before-network\"",
+              "/first-boot?interface=vmbr0&vlan-id=1110");
+        } else {
+          assertThat(body).doesNotContain("[first-boot]");
+        }
+
         Path renderedFile = tempDir.resolve(mac + "-rendered.toml");
         Files.write(renderedFile, rendered);
         maybeValidateWithAssistant(renderedFile);

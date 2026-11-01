@@ -11,7 +11,7 @@ The internal homelab needs a small Spring Boot service that answers Proxmox auto
 
 ## Decision
 
-Build the service with Spring Boot 4+ and Java 25 using the base package `io.github.lsampaioweb`. Initially it resolved and returned automated-installation TOML answers. ADR-0006 adds installation-completion logging.
+Build the service with Spring Boot 4+ and Java 25 using the base package `io.github.lsampaioweb`. Initially it resolved and returned automated-installation TOML answers. ADR-0006 adds installation-completion logging; ADR-0007 independently adds an optional first-boot DHCP VLAN script.
 
 The deployment is internal to the homelab. The application has no authentication and exposes no CRUD operations. Internal HTTP is approved; HTTPS through a reverse proxy remains an optional transport-protection measure.
 
@@ -25,7 +25,7 @@ The service is intentionally narrow and mostly stateless. Answer-file changes ar
 - User accounts, application authentication, or authorization workflows.
 - Database persistence.
 - Create, update, or delete endpoints.
-- Installation orchestration beyond answer delivery and the webhook in ADR-0006.
+- Installation orchestration beyond answer delivery and the two hooks in ADR-0006 and ADR-0007.
 
 ## Alternatives Considered
 

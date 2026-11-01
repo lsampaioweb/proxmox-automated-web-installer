@@ -10,7 +10,7 @@
 
 The Proxmox Web Installer is a lightweight Spring Boot service that dynamically provides Proxmox automated-installation TOML answer files based on MAC address lookups. It replaces manual or static configuration with intelligent, filesystem-based answer file management.
 
-The service is database-free and internal-only. Separate decisions cover answer delivery and completion logging.
+The service is database-free and internal-only. Separate decisions cover answer delivery, completion logging, and an optional first-boot VLAN script.
 
 ## ADRs
 
@@ -22,6 +22,7 @@ The service is database-free and internal-only. Separate decisions cover answer 
 | [0004](0004-errors-security-and-audit.md) | Errors, Security, and Audit | ✅ Accepted |
 | [0005](0005-testing-and-operations.md) | Testing and Operations | ✅ Accepted |
 | [0006](0006-post-install-webhook.md) | Proxmox Post-Install Webhook | ✅ Accepted |
+| [0007](0007-first-boot-vlan-configuration.md) | First-Boot VLAN Configuration | ✅ Accepted |
 
 ## Current Status
 
@@ -34,7 +35,7 @@ The service is database-free and internal-only. Separate decisions cover answer 
 
 ## Key Principles
 
-1. **Bounded scope:** Answer files and installation-completion logs.
+1. **Bounded scope:** Answer files, installation-completion logs, and a first-boot VLAN script.
 2. **Stateless operation:** No database, no persistent state, no complex dependencies
 3. **Filesystem as source:** Answer-template changes are direct filesystem edits; the root password is injected and hashed at runtime
 4. **Internal only:** Network boundary enforcement; HTTP supported, HTTPS recommended
@@ -56,7 +57,9 @@ Rendered TOML response to Proxmox
 Proxmox installs from answer file
 ```
 
-After installation, Proxmox sends the completion webhook.
+After installation, Proxmox sends the completion webhook. On configured
+hosts, it separately runs the downloaded first-boot VLAN script before
+networking. The webhook does not confirm that the script ran successfully.
 
 ## Related Concepts
 

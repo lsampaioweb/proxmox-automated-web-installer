@@ -11,7 +11,7 @@ Proxmox Automated Installation sends a `POST` request with JSON that includes `n
 
 ## Decision
 
-Expose `POST /answer` for answer delivery. This ADR owns its unchanged protocol; ADR-0006 owns the webhook endpoint.
+Expose `POST /answer` for answer delivery. This ADR owns its unchanged protocol; ADR-0006 and ADR-0007 own the independent hook endpoints.
 
 Follow the Proxmox HTTP source protocol. Ignore unknown keys, including `enable_btrfs`, so newer installer documents still work. Check `network_interfaces` in request order. Skip a missing or blank `mac`; trim each nonblank value and require six two-digit ASCII hexadecimal octets separated by colons (`XX:XX:XX:XX:XX:XX`). If any nonblank MAC is malformed, reject the whole request before looking at the filesystem. Return HTTP 400 with `ANSWER_MAC_INVALID`. Otherwise, lowercase each valid MAC and use the first one with a matching answer file. Filename matching ignores letter case. If every MAC is missing or blank, return HTTP 400 with `ANSWER_MAC_REQUIRED`.
 
@@ -50,7 +50,7 @@ Multi-interface nodes are identified even when the management NIC is not `networ
 
 ## Out of scope
 
-- Webhook behavior, specified separately in ADR-0006.
+- Hook behavior, specified separately in ADR-0006 and ADR-0007.
 - Rewriting, normalizing, or augmenting TOML beyond the in-memory root-password placeholder substitution.
 - Application-level authentication (`Authorization: Bearer` is optional in the ISO, not in this service).
 - Serving JSON answer documents.
