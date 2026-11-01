@@ -5,7 +5,7 @@ spring:
     basename: "i18n/messages"
     encoding: "UTF-8"
     default-locale: "en"
-    fallback-to-system-locale: true
+    fallback-to-system-locale: false
   threads:
     virtual:
       enabled: true
