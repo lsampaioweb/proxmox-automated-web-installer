@@ -21,81 +21,81 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AnswerRequest(
-        @JsonProperty("$schema") DocumentSchema schema,
-        Product product,
-        Iso iso,
-        Dmi dmi,
-        @JsonProperty("network_interfaces") @NotEmpty(message = "{error.validation.network.interfaces.required}") List<NetworkInterfaceRequest> networkInterfaces) {
+    @JsonProperty("$schema") DocumentSchema schema,
+    Product product,
+    Iso iso,
+    Dmi dmi,
+    @JsonProperty("network_interfaces") @NotEmpty(message = "{error.validation.network.interfaces.required}") List<NetworkInterfaceRequest> networkInterfaces) {
 
-    /**
-     * Schema version reported by the installer.
-     *
-     * @param version schema version string
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record DocumentSchema(String version) {
-    }
+  /**
+   * Schema version reported by the installer.
+   *
+   * @param version schema version string
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record DocumentSchema(String version) {
+  }
 
-    /**
-     * Product details sent by the installer.
-     *
-     * @param fullname human-readable product name
-     * @param product  short product code
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Product(
-            String fullname,
-            String product) {
-    }
+  /**
+   * Product details sent by the installer.
+   *
+   * @param fullname human-readable product name
+   * @param product  short product code
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Product(
+      String fullname,
+      String product) {
+  }
 
-    /**
-     * Release details for the installer ISO.
-     *
-     * @param release    ISO release
-     * @param isorelease ISO point release
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Iso(String release, String isorelease) {
-    }
+  /**
+   * Release details for the installer ISO.
+   *
+   * @param release    ISO release
+   * @param isorelease ISO point release
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Iso(String release, String isorelease) {
+  }
 
-    /**
-     * Hardware details reported through DMI.
-     *
-     * @param system    system DMI block
-     * @param baseboard baseboard DMI block
-     * @param chassis   chassis DMI block
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Dmi(SystemInfo system, Baseboard baseboard, Chassis chassis) {
-    }
+  /**
+   * Hardware details reported through DMI.
+   *
+   * @param system    system DMI block
+   * @param baseboard baseboard DMI block
+   * @param chassis   chassis DMI block
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Dmi(SystemInfo system, Baseboard baseboard, Chassis chassis) {
+  }
 
-    /**
-     * System identifiers used in audit logs.
-     *
-     * @param serial system serial number
-     * @param name   system product name
-     * @param uuid   system UUID
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record SystemInfo(String serial, String name, String uuid) {
-    }
+  /**
+   * System identifiers used in audit logs.
+   *
+   * @param serial system serial number
+   * @param name   system product name
+   * @param uuid   system UUID
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record SystemInfo(String serial, String name, String uuid) {
+  }
 
-    /**
-     * Baseboard details used in audit logs.
-     *
-     * @param serial baseboard serial number
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Baseboard(String serial) {
-    }
+  /**
+   * Baseboard details used in audit logs.
+   *
+   * @param serial baseboard serial number
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Baseboard(String serial) {
+  }
 
-    /**
-     * Chassis details used in audit logs.
-     *
-     * @param serial chassis serial number
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Chassis(String serial) {
-    }
+  /**
+   * Chassis details used in audit logs.
+   *
+   * @param serial chassis serial number
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Chassis(String serial) {
+  }
 
 }
