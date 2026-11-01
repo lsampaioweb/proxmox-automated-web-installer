@@ -89,8 +89,9 @@ must never contain request JSON, answer contents, or password material.
 ## Prepare the ISO
 
 The automated installer fetches the answer from the configured URL. In this
-project the application listens on port `8080`; production clients should reach
-it through the TLS-terminating reverse proxy, typically on port `443`.
+project the application listens on port `8080`. Internal HTTP is supported;
+HTTPS through a trusted reverse proxy is optional and recommended for transport
+protection. Never expose the service publicly.
 
 The assistant uses `--fetch-from http` for its HTTP answer-source mode. This
 selects the source mode; it can still use TLS when the URL begins with
@@ -116,7 +117,7 @@ bash scripts/prepare-proxmox-auto-iso.sh \
 
 The default answer URL is
 `http://proxmox-auto-install-assistant.lan.homelab:8080/answer`; use plain HTTP
-only on a trusted test network. The hostname must resolve from the installer
+only on a trusted internal network. The hostname must resolve from the installer
 network using the DNS server supplied by DHCP. A successful lookup on the
 preparation laptop alone does not establish this. For the tested network:
 
@@ -155,7 +156,7 @@ before the HTTP answer fetch.
 ### Standard preparation alternatives
 
 These commands do not extend the installer's DHCP timeout. Use them when the
-stock discovery window is sufficient. For a trusted test network only:
+stock discovery window is sufficient. For a trusted internal network:
 
 ```bash
 proxmox-auto-install-assistant prepare-iso \
@@ -193,6 +194,40 @@ cat auto-installer-mode.toml
 Confirm that the sidecar reports `mode = "http"` and a URL ending in
 `/answer`. The sidecar records preparation settings; it is not a readback of the
 ISO's embedded contents.
+
+## Installation hooks
+
+The webhook reports successful installation.
+
+### Completion webhook
+
+All nine answer templates contain:
+
+```toml
+[post-installation-webhook]
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/post-install-events"
+```
+
+The installer must be able to reach this URL from its initial untagged network.
+The receiver accepts the official hyphenated `network-interfaces` key, ignores
+unknown fields, and returns `{"received":true,"receivedAt":"..."}`. Required
+metadata is the product short name, FQDN, and a nonempty array of interfaces
+with valid MACs. DMI UUID, interface name, product fullname, and version are
+optional. The existing 1 MiB body limit and localized errors apply.
+
+Test the receiver without sending secrets:
+
+```bash
+curl -fsS -H 'Content-Type: application/json' \
+  -d '{"product":{"short":"pve","fullname":"Proxmox VE","version":"9.2"},"fqdn":"pve-01.lan.home","network-interfaces":[{"name":"enp2lacp3","mac":"60:be:b4:08:f7:69"}]}' \
+  http://localhost:8080/api/v1/post-install-events
+```
+
+The existing application log records receipt time, product identifiers, FQDN,
+optional system UUID, and interface names/MACs only. It does not retain the
+payload or log serials, addresses, disks, udev properties, machine IDs, SSH
+keys, or unknown fields. There is no database, webhook-triggered action, or
+separate completion-record store.
 
 ## Write the USB installer
 

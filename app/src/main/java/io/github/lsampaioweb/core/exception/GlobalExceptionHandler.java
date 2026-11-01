@@ -44,6 +44,7 @@ public class GlobalExceptionHandler {
 
   private static final String LOG_UNHANDLED = "log.exception.unhandled";
   private static final String LOG_REJECTED = "log.request.rejected";
+  private static final String LOG_HOOK_REJECTED = "log.hook.rejected";
 
   private static final String CODE_INTERNAL = "INTERNAL_ERROR";
   private static final String CODE_RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
@@ -82,6 +83,9 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(AppException.class)
   public ResponseEntity<ErrorResponse> handleAppException(AppException ex, HttpServletRequest request) {
+    if (!"/answer".equals(request.getRequestURI())) {
+      logRejectedRequest(request, ex.getErrorCode());
+    }
     return problem(ex.getStatus(), ex.getErrorCode(), ex.getMessageKey(), ex.getArgs(), request, ex, null);
   }
 
@@ -210,20 +214,17 @@ public class GlobalExceptionHandler {
   }
 
   private void logRejectedRequest(HttpServletRequest request, String errorCode) {
+    if (!"/answer".equals(request.getRequestURI())) {
+      log.warn(logMessages.get(RequestContextUtils.getLocale(request), LOG_HOOK_REJECTED,
+          Instant.now(), errorCode));
+      return;
+    }
     log.warn(logMessages.get(
         RequestContextUtils.getLocale(request),
         LOG_REJECTED,
         Instant.now().atOffset(ZoneOffset.UTC),
-        safeLogField(request.getRemoteAddr()),
+        LogMessages.safeField(request.getRemoteAddr()),
         errorCode));
-  }
-
-  private String safeLogField(String value) {
-    if (value == null) {
-      return "";
-    }
-
-    return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
   }
 
   private String traceOf(Throwable ex) {

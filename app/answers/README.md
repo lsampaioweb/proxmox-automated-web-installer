@@ -14,8 +14,9 @@ Each file is a Proxmox answer template:
 
 Source files are never modified. Secrets are never logged.
 
-Ansible configures bonds and VLANs after installation. During setup, Proxmox
-configures the initial network interface and pins its name.
+During setup, Proxmox configures an untagged network interface and pins its name.
+All nine templates send completion reports to `/api/v1/post-install-events`.
+Ansible configures bonds and VLANs after installation. See [installation hooks](../../docs/operations/automated-installation.md#installation-hooks).
 
 ## Configure the root password
 

@@ -50,4 +50,13 @@ public class LogMessages {
     return messageSource.getMessage(key, args, locale);
   }
 
+  /** Removes line-breaking characters from request-derived log fields. */
+  public static String safeField(String value) {
+    if (value == null) {
+      return "";
+    }
+
+    return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
+  }
+
 }

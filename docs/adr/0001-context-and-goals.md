@@ -11,9 +11,9 @@ The internal homelab needs a small Spring Boot service that answers Proxmox auto
 
 ## Decision
 
-Build the service with Spring Boot 4+ and Java 25 using the base package `io.github.lsampaioweb`. The service has one responsibility: resolve and return the Proxmox automated-installation TOML answer file for the requesting node.
+Build the service with Spring Boot 4+ and Java 25 using the base package `io.github.lsampaioweb`. Initially it resolved and returned automated-installation TOML answers. ADR-0006 adds installation-completion logging.
 
-The deployment is internal to the homelab. The application has no authentication and exposes no CRUD operations. TLS terminates at an internal reverse proxy by default; `server.ssl.*` may be configured only when the JVM itself must terminate TLS.
+The deployment is internal to the homelab. The application has no authentication and exposes no CRUD operations. Internal HTTP is approved; HTTPS through a reverse proxy remains an optional transport-protection measure.
 
 ## Consequences
 
@@ -25,11 +25,10 @@ The service is intentionally narrow and mostly stateless. Answer-file changes ar
 - User accounts, application authentication, or authorization workflows.
 - Database persistence.
 - Create, update, or delete endpoints.
-- Post-installation webhook receivers.
-- Proxmox installation orchestration beyond serving the answer file.
+- Installation orchestration beyond answer delivery and the webhook in ADR-0006.
 
 ## Alternatives Considered
 
-1. **Terraform/Ansible provisioning:** Rejected because it requires an agent on each target. This service needs no setup on the target machines.
+1. **Terraform/Ansible provisioning:** Not a replacement for the bare-metal installer's answer endpoint. Ansible is agentless and remains suitable for configuration after installation.
 2. **Static HTTP file server (nginx):** Rejected because every MAC would need a manual URL mapping. This service looks up the matching file itself.
 3. **Database-backed answer file repository:** Rejected because a database would add schema, migration, and backup work. The filesystem is enough for this homelab.

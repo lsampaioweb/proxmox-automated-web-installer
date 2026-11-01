@@ -21,7 +21,9 @@ Requests rejected before the service (invalid JSON, validation failures, oversiz
 
 The root password is supplied through protected runtime configuration and hashed once at startup using yescrypt. `crypt(3)` is not thread-safe and must remain on the startup path only.
 
-TLS terminates at an internal reverse proxy by default. The application rejects request bodies larger than 1 MiB before message conversion; the reverse proxy should enforce the same or a stricter limit. Application-level authentication remains disabled because this is an internal homelab service; network placement and transport protection are the operational controls.
+Internal HTTP is approved for answer delivery and the completion webhook. HTTPS via an internal reverse proxy remains optional and recommended for transport protection. The application rejects request bodies larger than 1 MiB before message conversion; any reverse proxy should enforce the same or a stricter limit. Application-level authentication remains disabled; the internal network boundary is mandatory.
+
+Webhook success logs use only the allowlist in ADR-0006, not the richer answer-request audit metadata. Hook rejections log an error code without the request body or query values.
 
 Actuator endpoints are also unauthenticated. Expose only `health`, `info`, and `metrics`, and keep them behind the internal network boundary. Do not expose the service directly to the public internet.
 
@@ -34,7 +36,7 @@ Stable error codes distinguish malformed requests, missing answers, template-pol
 - Logging full requests or answer files: rejected because those payloads may contain sensitive installation configuration.
 - Returning detailed internal errors or third-party cause messages to callers: rejected because diagnostics belong in controlled operator logs, not API responses.
 - Skipping malformed MAC values and continuing lookup: rejected; malformed nonblank MACs are client errors and must not be used to construct filesystem paths.
-- Adding application-level authentication: rejected for this internal homelab service; network placement and TLS remain the operational controls.
+- Adding application-level authentication: rejected for this internal homelab service; network placement is mandatory and TLS remains recommended.
 - Exposing all Actuator endpoints: rejected; only `health`, `info`, and `metrics` are exposed.
 - Requiring TLS termination in the application: rejected as the default deployment constraint; TLS may instead terminate at an internal reverse proxy.
 

@@ -65,7 +65,9 @@ class AnswerTemplatesValidationTest {
         assertThat(body)
             .doesNotContain("__PROXMOX_ROOT_PASSWORD_HASH__")
             .contains(PASSWORD_HASH)
-            .contains("[network.interface-name-pinning]");
+            .contains("[network.interface-name-pinning]")
+            .contains("[post-installation-webhook]")
+            .contains("url = \"http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/post-install-events\"");
 
         Path renderedFile = tempDir.resolve(mac + "-rendered.toml");
         Files.write(renderedFile, rendered);

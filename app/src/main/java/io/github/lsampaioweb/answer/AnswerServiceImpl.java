@@ -168,12 +168,7 @@ class AnswerServiceImpl implements AnswerService {
   }
 
   private String safeLogField(String value) {
-    if (value == null) {
-      return "";
-    }
-
-    // Keep request data from creating extra log lines.
-    return value.replaceAll("[\\p{Cc}\\p{Zl}\\p{Zp}]", "_");
+    return LogMessages.safeField(value);
   }
 
   private record AuditContext(Instant startedAt, String clientAddress, AnswerRequest request, String macMetadata,

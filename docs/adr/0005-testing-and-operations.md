@@ -7,7 +7,7 @@
 
 ## Context
 
-The service exposes one endpoint, but its behavior depends on request shape, MAC validation, lookup order, filesystem state, symlink handling, password rendering, and audit logging. Proxmox also publishes compatibility guidance and provides `validate-answer` for checking rendered files.
+Answer delivery depends on request shape, MAC validation, lookup order, filesystem state, symlink handling, password rendering, and audit logging. ADR-0006 adds webhook tests. Proxmox provides `validate-answer` for checking rendered files.
 
 ## Decision
 
@@ -36,7 +36,7 @@ Error-response tests must check status, error code, and localized messages in En
 
 Render every committed template in the test suite. If `proxmox-auto-install-assistant` is installed and supports the template schema, run `validate-answer` on each rendered file. If the installed tool rejects a newer field such as interface-name pinning, skip only the external validation. Keep the rendering checks running.
 
-Operational setup must provide the externally configured answer-file directory, seed templates from `host_vars` `mac_bind`, set `PROXMOX_ROOT_PASSWORD` through a protected runtime environment, ensure Linux `libcrypt` supports yescrypt, place a TLS-terminating reverse proxy in front of production, and keep request bodies within the application's 1 MiB limit. Restart the service to change the password.
+Operational setup must provide the externally configured answer-file directory, seed templates from `host_vars` `mac_bind`, set `PROXMOX_ROOT_PASSWORD` through a protected runtime environment, ensure Linux `libcrypt` supports yescrypt, enforce the internal network boundary, and keep request bodies within the application's 1 MiB limit. Internal HTTP is supported; TLS termination is optional. Restart the service to change the password.
 
 ## Consequences
 

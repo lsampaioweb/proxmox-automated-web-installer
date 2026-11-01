@@ -1,8 +1,8 @@
 # Proxmox Web Installer Architecture Decision Records
 
 **Project:** Proxmox Web Installer (automated Proxmox installation answer server)
-**Status:** Design complete
-**Last updated:** 2026-09-29
+**Status:** Decisions accepted
+**Last updated:** 2026-10-26
 
 ---
 
@@ -10,7 +10,7 @@
 
 The Proxmox Web Installer is a lightweight Spring Boot service that dynamically provides Proxmox automated-installation TOML answer files based on MAC address lookups. It replaces manual or static configuration with intelligent, filesystem-based answer file management.
 
-The service is intentionally minimal: mostly stateless, database-free, and focused on a single responsibility. It runs internally on the homelab network only.
+The service is database-free and internal-only. Separate decisions cover answer delivery and completion logging.
 
 ## ADRs
 
@@ -21,6 +21,7 @@ The service is intentionally minimal: mostly stateless, database-free, and focus
 | [0003](0003-filesystem-answer-repository.md) | Filesystem Answer Repository | ✅ Accepted |
 | [0004](0004-errors-security-and-audit.md) | Errors, Security, and Audit | ✅ Accepted |
 | [0005](0005-testing-and-operations.md) | Testing and Operations | ✅ Accepted |
+| [0006](0006-post-install-webhook.md) | Proxmox Post-Install Webhook | ✅ Accepted |
 
 ## Current Status
 
@@ -33,10 +34,10 @@ The service is intentionally minimal: mostly stateless, database-free, and focus
 
 ## Key Principles
 
-1. **Simplicity over features:** The service has one job: serve answer files.
+1. **Bounded scope:** Answer files and installation-completion logs.
 2. **Stateless operation:** No database, no persistent state, no complex dependencies
 3. **Filesystem as source:** Answer-template changes are direct filesystem edits; the root password is injected and hashed at runtime
-4. **Internal only:** Network boundary enforcement; TLS via reverse proxy by default
+4. **Internal only:** Network boundary enforcement; HTTP supported, HTTPS recommended
 5. **Small runtime footprint:** One JVM service with the system `libcrypt` library for yescrypt hashing
 
 ## Architecture
@@ -54,6 +55,8 @@ Rendered TOML response to Proxmox
     ↓
 Proxmox installs from answer file
 ```
+
+After installation, Proxmox sends the completion webhook.
 
 ## Related Concepts
 

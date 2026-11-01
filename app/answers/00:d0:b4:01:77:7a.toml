@@ -28,3 +28,6 @@ enabled = true
 filesystem = "ext4"
 # Placeholder only: replace disk-list with a stable selector before installation.
 disk-list = ["sda"]
+
+[post-installation-webhook]
+url = "http://proxmox-auto-install-assistant.lan.homelab:8080/api/v1/post-install-events"

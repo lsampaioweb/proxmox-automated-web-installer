@@ -1,10 +1,10 @@
 # Proxmox Web Installer
 
-Spring Boot service that returns Proxmox automated-installation TOML answer files selected by installer-reported MAC address.
+Spring Boot service for Proxmox automated installation: answer delivery and completion logging.
 
 ## Purpose
 
-Serve the operator-managed answer file selected from a Proxmox installer request.
+Serve Proxmox installation answers and log completion.
 
 ## Overview
 
@@ -13,6 +13,7 @@ Serve the operator-managed answer file selected from a Proxmox installer request
 - Reads operator-managed TOML templates from a configurable directory.
 - Renders the root-password hash in memory and returns TOML.
 - Localizes API errors and request logs; audit records omit request bodies and answer contents.
+- Receives installation-completion webhooks without storing the payload.
 
 ## Prerequisites
 
@@ -36,11 +37,11 @@ Do not commit secrets or pass the password as a command-line argument. Templates
 using the password placeholder share one salted yescrypt hash generated at
 startup. Restart the service to apply password changes.
 
-In production, the app listens on plain HTTP at port `8080` behind a trusted
-reverse proxy. The proxy should terminate TLS, typically on port `443`, and
-forward the original client headers. The app rejects request bodies over 1 MiB;
-set the proxy limit to the same size or lower. The service has no authentication,
-so keep it and its Actuator endpoints off the public internet.
+The app listens on HTTP at port `8080`. Internal HTTP is supported; an optional
+trusted reverse proxy can terminate HTTPS and forward original client headers.
+The app rejects request bodies over 1 MiB; set any proxy limit to the same size
+or lower. The service has no authentication: restrict it and Actuator to the
+trusted installation network, never the public internet.
 
 ## Run
 
@@ -65,8 +66,7 @@ curl -fsS -o /dev/null -w 'HTTP %{http_code} %{content_type}\n' \
   http://localhost:8080/answer
 ```
 
-For production, run the `production` profile behind the configured TLS reverse
-proxy:
+For production, run the `production` profile within the trusted internal network:
 
 ```bash
 cd app
@@ -76,7 +76,8 @@ SPRING_PROFILES_ACTIVE=production mvn spring-boot:run
 ## Access
 
 - Answer endpoint: `POST http://localhost:8080/answer` (application upstream).
-- Production client URL: `https://your-proxy-host/answer`.
+- Completion webhook: `POST http://localhost:8080/api/v1/post-install-events`.
+- Optional HTTPS client URL: `https://your-proxy-host/answer`.
 - Health endpoint: `GET http://localhost:8080/actuator/health`.
 - OpenAPI JSON (development only): `http://localhost:8080/v3/api-docs`.
 - Swagger UI (development only): `http://localhost:8080/swagger-ui.html`.
@@ -106,6 +107,7 @@ the suite also validates the rendered files with `validate-answer`.
 | Method | Path | Success | Errors |
 |---|---|---|---|
 | `POST` | `/answer` | `200` + `application/toml` | `400` invalid JSON / validation / MAC errors; `413` body over 1 MiB; `404` no matching file; `405` wrong method; `415` wrong Content-Type; `500` unreadable file, invalid TOML, invalid template, or internal error |
+| `POST` | `/api/v1/post-install-events` | `200` + JSON receipt | `400` invalid JSON / metadata; `413` body over 1 MiB; `405` wrong method; `415` wrong Content-Type |
 
 Errors use `application/json` with a localized message and stable `errorCode`.
 
